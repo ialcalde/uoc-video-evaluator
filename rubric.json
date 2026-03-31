@@ -1,0 +1,185 @@
+{
+  "title": "UOC Video Presentation Evaluation Rubric",
+  "version": "1.0",
+  "language": "ca",
+  "totalPoints": 10,
+  "criteria": [
+    {
+      "id": "content_accuracy",
+      "name": "Contingut i precisió",
+      "nameEn": "Content & Accuracy",
+      "weight": 0.30,
+      "description": "The video accurately covers the required topic, demonstrates understanding of key concepts, and presents correct information.",
+      "levels": [
+        {
+          "score": 10,
+          "label": "Excel·lent",
+          "description": "All key concepts are covered accurately and in depth. No factual errors. Demonstrates excellent command of the subject."
+        },
+        {
+          "score": 7,
+          "label": "Notable",
+          "description": "Most key concepts are covered correctly. Minor omissions or superficial treatment of some points. No significant errors."
+        },
+        {
+          "score": 5,
+          "label": "Aprovat",
+          "description": "Core concepts are present but treatment is uneven. Some inaccuracies or gaps in coverage."
+        },
+        {
+          "score": 3,
+          "label": "Suspès",
+          "description": "Significant gaps or errors in content. Key concepts are missing or incorrectly explained."
+        },
+        {
+          "score": 0,
+          "label": "No presentat",
+          "description": "No meaningful content related to the topic."
+        }
+      ]
+    },
+    {
+      "id": "structure_clarity",
+      "name": "Estructura i claredat",
+      "nameEn": "Structure & Clarity",
+      "weight": 0.20,
+      "description": "The presentation has a clear introduction, logical development, and a conclusion. Ideas flow coherently.",
+      "levels": [
+        {
+          "score": 10,
+          "label": "Excel·lent",
+          "description": "Clear and logical structure with compelling intro, well-organised body, and strong conclusion. Transitions are smooth."
+        },
+        {
+          "score": 7,
+          "label": "Notable",
+          "description": "Good overall structure. Minor issues with flow or transitions. Intro and conclusion are present."
+        },
+        {
+          "score": 5,
+          "label": "Aprovat",
+          "description": "Discernible structure but parts feel disjointed or the conclusion is weak."
+        },
+        {
+          "score": 3,
+          "label": "Suspès",
+          "description": "Poor organisation. Difficult to follow the argument or thread."
+        },
+        {
+          "score": 0,
+          "label": "No presentat",
+          "description": "No discernible structure."
+        }
+      ]
+    },
+    {
+      "id": "oral_expression",
+      "name": "Expressió oral",
+      "nameEn": "Oral Expression",
+      "weight": 0.20,
+      "description": "Clarity of speech, appropriate pace, vocabulary, and avoidance of filler words or reading verbatim from notes.",
+      "levels": [
+        {
+          "score": 10,
+          "label": "Excel·lent",
+          "description": "Confident, clear delivery at an appropriate pace. Rich vocabulary. Minimal filler words. Speaks naturally rather than reading."
+        },
+        {
+          "score": 7,
+          "label": "Notable",
+          "description": "Generally clear. Occasional hesitation or filler words. Some reliance on notes but not disruptive."
+        },
+        {
+          "score": 5,
+          "label": "Aprovat",
+          "description": "Understandable but delivery is monotone, too fast/slow, or includes frequent filler words."
+        },
+        {
+          "score": 3,
+          "label": "Suspès",
+          "description": "Difficult to follow due to delivery issues. Heavy reading from script."
+        },
+        {
+          "score": 0,
+          "label": "No presentat",
+          "description": "No meaningful audio or completely inaudible."
+        }
+      ]
+    },
+    {
+      "id": "critical_analysis",
+      "name": "Anàlisi crítica",
+      "nameEn": "Critical Analysis",
+      "weight": 0.20,
+      "description": "Goes beyond description to offer analysis, interpretation, personal reflection, or evaluation of different perspectives.",
+      "levels": [
+        {
+          "score": 10,
+          "label": "Excel·lent",
+          "description": "Strong critical analysis. Challenges assumptions, compares perspectives, or draws insightful original conclusions."
+        },
+        {
+          "score": 7,
+          "label": "Notable",
+          "description": "Some analytical thinking evident. Not purely descriptive. Attempts to evaluate or interpret."
+        },
+        {
+          "score": 5,
+          "label": "Aprovat",
+          "description": "Mostly descriptive with limited critical engagement."
+        },
+        {
+          "score": 3,
+          "label": "Suspès",
+          "description": "Purely descriptive. No evidence of analysis or reflection."
+        },
+        {
+          "score": 0,
+          "label": "No presentat",
+          "description": "No analytical content."
+        }
+      ]
+    },
+    {
+      "id": "citations_references",
+      "name": "Citacions i referències",
+      "nameEn": "Citations & References",
+      "weight": 0.10,
+      "description": "Sources are cited verbally or shown on screen. Academic or credible sources are used.",
+      "levels": [
+        {
+          "score": 10,
+          "label": "Excel·lent",
+          "description": "Multiple credible sources cited appropriately throughout. References are relevant and support the arguments."
+        },
+        {
+          "score": 7,
+          "label": "Notable",
+          "description": "Sources are cited. Minor issues with relevance or citation format."
+        },
+        {
+          "score": 5,
+          "label": "Aprovat",
+          "description": "At least one source cited, or sources visible on screen without verbal citation."
+        },
+        {
+          "score": 3,
+          "label": "Suspès",
+          "description": "No citations, though content implies external sources were used."
+        },
+        {
+          "score": 0,
+          "label": "No presentat",
+          "description": "No sources."
+        }
+      ]
+    }
+  ],
+  "gradingScale": [
+    { "min": 9.0, "max": 10.0, "label": "Excel·lent (A)" },
+    { "min": 7.0, "max": 8.9,  "label": "Notable (B)" },
+    { "min": 5.0, "max": 6.9,  "label": "Aprovat (C)" },
+    { "min": 3.0, "max": 4.9,  "label": "Suspès (D)" },
+    { "min": 0.0, "max": 2.9,  "label": "Suspès (F)" }
+  ]
+}
