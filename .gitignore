@@ -2,5 +2,7 @@ node_modules/
 .env
 output/*
 tmp/*
+input_videos/*
 !output/.gitkeep
 !tmp/.gitkeep
+!input_videos/.gitkeep

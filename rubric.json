@@ -2,6 +2,7 @@
   "title": "UOC Video Presentation Evaluation Rubric",
   "version": "1.0",
   "language": "ca",
+  "feedbackLanguage": "ca",
   "totalPoints": 10,
   "criteria": [
     {
