@@ -59,8 +59,9 @@ export async function processVideo({
     await extractAudioFn(videoPath, audioPath);
 
     // 2. Transcribe
-    log.info(`[${student}] Transcribing (Whisper, lang=ca)…`);
-    const transcript = await transcribeFn(audioPath, openai);
+    const lang = rubric.language || 'ca';
+    log.info(`[${student}] Transcribing (Whisper, lang=${lang})…`);
+    const transcript = await transcribeFn(audioPath, openai, { language: lang });
 
     if (!transcript.text?.trim()) {
       throw new Error('Transcription is empty — does the video have audio?');

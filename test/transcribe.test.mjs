@@ -50,6 +50,12 @@ describe('transcribe', () => {
     assert.deepEqual(params.timestamp_granularities, ['segment']);
   });
 
+  it('uses the provided language option', async () => {
+    const { client, getParams } = makeOpenAI({ text: 'Hello', segments: [] });
+    await transcribe(_audioPath, client, { language: 'en' });
+    assert.equal(getParams().language, 'en');
+  });
+
   it('returns the response object from the API', async () => {
     const expected = {
       text:     'Avui presentaré el projecte.',
