@@ -26,7 +26,7 @@ export function validateEvaluation(raw, rubric) {
   }
 
   // 2. Required top-level fields
-  for (const field of ['criteria', 'weightedScore', 'grade', 'overallFeedback']) {
+  for (const field of ['criteria', 'overallFeedback']) {
     if (parsed[field] === undefined) {
       throw new Error(`Missing required field: "${field}"`);
     }
@@ -37,8 +37,11 @@ export function validateEvaluation(raw, rubric) {
     throw new Error('"criteria" must be an array');
   }
 
-  // 4. Each criterion must match rubric and have a valid score
+  // 4. Each rubric criterion must be present with a valid score and justification
   const rubricIds = new Set(rubric.criteria.map(c => c.id));
+  const parsedIds = new Set(parsed.criteria.map(c => c.id));
+
+  // Unknown IDs first (catches Claude hallucinating criterion names)
   for (const c of parsed.criteria) {
     if (!c.id || !rubricIds.has(c.id)) {
       throw new Error(`Unknown or missing criterion id: "${c.id}"`);
@@ -53,12 +56,24 @@ export function validateEvaluation(raw, rubric) {
     }
   }
 
-  // 5. weightedScore must be a number
-  if (typeof parsed.weightedScore !== 'number') {
-    throw new Error(
-      `"weightedScore" must be a number, got: ${typeof parsed.weightedScore}`
-    );
+  // Missing IDs second (catches Claude omitting a criterion entirely)
+  for (const { id } of rubric.criteria) {
+    if (!parsedIds.has(id)) {
+      throw new Error(`Missing criterion in evaluation: "${id}"`);
+    }
   }
+
+  // 5. Recompute weightedScore and grade from verified criterion scores
+  const weightMap      = Object.fromEntries(rubric.criteria.map(c => [c.id, c.weight]));
+  const computed       = parsed.criteria.reduce((s, c) => s + c.score * weightMap[c.id], 0);
+  parsed.weightedScore = Math.round(computed * 100) / 100;
+
+  const scaleEntry = rubric.gradingScale.find(
+    g => parsed.weightedScore >= g.min && parsed.weightedScore <= g.max
+  );
+  parsed.grade = scaleEntry
+    ? scaleEntry.label
+    : rubric.gradingScale[rubric.gradingScale.length - 1].label;
 
   return parsed;
 }

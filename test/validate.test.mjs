@@ -47,7 +47,7 @@ describe('validateEvaluation', () => {
 
   // ── Missing top-level fields ────────────────────────────────────────────────
 
-  for (const field of ['criteria', 'weightedScore', 'grade', 'overallFeedback']) {
+  for (const field of ['criteria', 'overallFeedback']) {
     it(`throws when "${field}" is missing`, () => {
       const ev = { ...validEvaluation };
       delete ev[field];
@@ -152,13 +152,26 @@ describe('validateEvaluation', () => {
     );
   });
 
-  // ── weightedScore type ──────────────────────────────────────────────────────
+  // ── weightedScore and grade are recomputed ──────────────────────────────────
 
-  it('throws when weightedScore is a string', () => {
-    const ev = { ...validEvaluation, weightedScore: '7.6' };
+  it('recomputes weightedScore from criterion scores regardless of Claude value', () => {
+    const ev = { ...validEvaluation, weightedScore: 99 };  // wrong Claude value
+    const result = validateEvaluation(toRaw(ev), mockRubric);
+    // 8 * 0.6 + 7 * 0.4 = 4.8 + 2.8 = 7.6
+    assert.equal(result.weightedScore, 7.6);
+  });
+
+  it('derives grade from the computed score and rubric scale', () => {
+    const ev = { ...validEvaluation, grade: 'Wrong Grade' };  // wrong Claude value
+    const result = validateEvaluation(toRaw(ev), mockRubric);
+    assert.equal(result.grade, 'Notable (B)');
+  });
+
+  it('throws when a rubric criterion is absent from the evaluation', () => {
+    const ev = { ...validEvaluation, criteria: [validEvaluation.criteria[0]] };  // only 1 of 2
     assert.throws(
       () => validateEvaluation(toRaw(ev), mockRubric),
-      /weightedScore.*number/i
+      /Missing criterion.*oral_expression/i
     );
   });
 });
