@@ -9,8 +9,10 @@ import {
   writeTranscript,
   writeEvaluation,
   writeFeedback,
+  writeCsv,
+  csvField,
 } from '../src/report.mjs';
-import { validEvaluation } from './fixtures.mjs';
+import { mockRubric, validEvaluation } from './fixtures.mjs';
 
 describe('report', () => {
   let tmpBase;
@@ -92,5 +94,78 @@ describe('report', () => {
     for (const c of validEvaluation.criteria) {
       assert.ok(content.includes(c.justification), `missing justification for ${c.id}`);
     }
+  });
+
+  // ── csvField ────────────────────────────────────────────────────────────────
+
+  it('csvField: plain text is returned as-is', () => {
+    assert.equal(csvField('hello'), 'hello');
+    assert.equal(csvField(7.5),     '7.5');
+    assert.equal(csvField(null),    '');
+    assert.equal(csvField(undefined), '');
+  });
+
+  it('csvField: strings with commas are double-quoted', () => {
+    assert.equal(csvField('Notable (B), aprovat'), '"Notable (B), aprovat"');
+  });
+
+  it('csvField: embedded double-quotes are escaped', () => {
+    assert.equal(csvField('She said "hi"'), '"She said ""hi"""');
+  });
+
+  it('csvField: strings with newlines are double-quoted', () => {
+    const result = csvField('line1\nline2');
+    assert.match(result, /^"/);
+    assert.match(result, /"$/);
+  });
+
+  // ── writeCsv ────────────────────────────────────────────────────────────────
+
+  it('writeCsv: creates results.csv with header and one ok row', async () => {
+    const results = [{ student: 'maria_lopez', status: 'ok', evaluation: validEvaluation }];
+    const csvPath = await writeCsv(tmpBase, results, mockRubric);
+
+    assert.ok(existsSync(csvPath));
+    const raw   = await readFile(csvPath, 'utf8');
+    const lines = raw.split('\n');
+
+    // Header: student,score,grade,status,content_accuracy,oral_expression,error
+    assert.ok(lines[0].startsWith('student,score,grade,status'));
+    assert.ok(lines[0].includes('content_accuracy'));
+    assert.ok(lines[0].includes('oral_expression'));
+
+    // Data row
+    assert.ok(lines[1].includes('maria_lopez'));
+    assert.ok(lines[1].includes(String(validEvaluation.weightedScore)));
+    assert.ok(lines[1].includes('ok'));
+  });
+
+  it('writeCsv: error rows have empty score/grade and a filled error column', async () => {
+    const results = [{ student: 'joan_puig', status: 'error', error: 'ffmpeg not found' }];
+    const csvPath = await writeCsv(tmpBase, results, mockRubric);
+
+    const raw  = await readFile(csvPath, 'utf8');
+    const row  = raw.split('\n')[1];
+
+    assert.ok(row.includes('joan_puig'));
+    assert.ok(row.includes('error'));
+    assert.ok(row.includes('ffmpeg not found'));
+  });
+
+  it('writeCsv: student names containing commas are quoted', async () => {
+    const results = [{
+      student:    'Puig, Joan',
+      status:     'ok',
+      evaluation: validEvaluation,
+    }];
+    const csvPath = await writeCsv(tmpBase, results, mockRubric);
+    const raw = await readFile(csvPath, 'utf8');
+
+    assert.ok(raw.includes('"Puig, Joan"'));
+  });
+
+  it('writeCsv: returns the path of the written file', async () => {
+    const csvPath = await writeCsv(tmpBase, [], mockRubric);
+    assert.ok(csvPath.endsWith('results.csv'));
   });
 });

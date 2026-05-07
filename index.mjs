@@ -13,9 +13,15 @@
  * Consolidated output:
  *   output/results.csv
  *
+ * Flags:
+ *   --drive-folder <id>   Read videos from a Google Drive folder.
+ *   --skip-existing       Skip students whose evaluation.json already exists
+ *                         (useful to resume an interrupted run without re-billing).
+ *
  * Usage:
  *   node index.mjs
  *   node index.mjs --drive-folder 1AbCdEfGhIjKlMnOpQrStUvWxYz
+ *   node index.mjs --skip-existing
  */
 
 import Anthropic from '@anthropic-ai/sdk';
@@ -34,6 +40,7 @@ import {
   writeTranscript,
   writeEvaluation,
   writeFeedback,
+  writeCsv,
 } from './src/report.mjs';
 import { authorise, listVideos, downloadVideo } from './src/drive.mjs';
 
@@ -70,11 +77,14 @@ function parseArgs(argv) {
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--drive-folder' && args[i + 1]) {
       opts.driveFolderId = args[++i];
+    } else if (args[i] === '--skip-existing') {
+      opts.skipExisting = true;
     }
   }
 
   // env var fallback
   opts.driveFolderId ??= process.env.GOOGLE_DRIVE_FOLDER_ID || null;
+  opts.skipExisting  ??= false;
   return opts;
 }
 
@@ -139,50 +149,16 @@ async function collectDriveVideos(folderId) {
   return entries;
 }
 
-// ── CSV helpers ───────────────────────────────────────────────────────────────
-function csvField(value) {
-  const s = String(value ?? '');
-  return (s.includes(',') || s.includes('"') || s.includes('\n'))
-    ? `"${s.replace(/"/g, '""')}"`
-    : s;
-}
-
-async function writeCsv(results, rubric) {
-  const criteriaIds = rubric.criteria.map(c => c.id);
-  const header = ['student', 'score', 'grade', 'status', ...criteriaIds, 'error'].join(',');
-
-  const rows = results.map(r => {
-    if (r.status === 'error') {
-      return [
-        csvField(r.student), '', '', 'error',
-        ...criteriaIds.map(() => ''),
-        csvField(r.error),
-      ].join(',');
-    }
-
-    const scoreMap = Object.fromEntries(
-      r.evaluation.criteria.map(c => [c.id, c.score])
-    );
-    return [
-      csvField(r.student),
-      r.evaluation.weightedScore,
-      csvField(r.evaluation.grade),
-      'ok',
-      ...criteriaIds.map(id => scoreMap[id] ?? ''),
-      '',
-    ].join(',');
-  });
-
-  const csv     = [header, ...rows].join('\n');
-  const csvPath = join(OUTPUT_DIR, 'results.csv');
-  await writeFile(csvPath, csv, 'utf8');
-  return csvPath;
-}
-
 // ── Single-video pipeline ─────────────────────────────────────────────────────
-async function processVideo(videoPath, student, anthropic, openai, rubric) {
+async function processVideo(videoPath, student, anthropic, openai, rubric, skipExisting = false) {
   const audioPath  = join(TMP_DIR, `${student}_${Date.now()}.mp3`);
   const studentDir = ensureStudentDir(OUTPUT_DIR, student);
+  const evalPath   = join(studentDir, 'evaluation.json');
+
+  if (skipExisting && existsSync(evalPath)) {
+    log.info(`[${student}] Already evaluated — skipping.`);
+    return JSON.parse(await readFile(evalPath, 'utf8'));
+  }
 
   try {
     // 1. Extract audio
@@ -219,7 +195,7 @@ async function processVideo(videoPath, student, anthropic, openai, rubric) {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 async function main() {
-  const { driveFolderId } = parseArgs(process.argv);
+  const { driveFolderId, skipExisting } = parseArgs(process.argv);
 
   // ── Required env vars ───────────────────────────────────────────────────────
   const missingKeys = [];
@@ -272,7 +248,7 @@ async function main() {
   for (const { videoPath, student, cleanup } of entries) {
     try {
       const evaluation = await processVideo(
-        videoPath, student, anthropic, openai, rubric
+        videoPath, student, anthropic, openai, rubric, skipExisting
       );
       results.push({ student, status: 'ok', evaluation });
     } catch (err) {
@@ -285,7 +261,7 @@ async function main() {
   }
 
   // ── Write CSV ───────────────────────────────────────────────────────────────
-  const csvPath = await writeCsv(results, rubric);
+  const csvPath = await writeCsv(OUTPUT_DIR, results, rubric);
 
   // ── Summary ─────────────────────────────────────────────────────────────────
   const nOk    = results.filter(r => r.status === 'ok').length;

@@ -2,6 +2,53 @@ import { existsSync, mkdirSync } from 'fs';
 import { writeFile } from 'fs/promises';
 import { join } from 'path';
 
+// ── CSV helpers ───────────────────────────────────────────────────────────────
+
+export function csvField(value) {
+  const s = String(value ?? '');
+  return (s.includes(',') || s.includes('"') || s.includes('\n'))
+    ? `"${s.replace(/"/g, '""')}"`
+    : s;
+}
+
+/**
+ * Write results.csv to outputDir.
+ *
+ * Each row: student, score, grade, status, <one column per criterion>, error
+ * Returns the full path of the written file.
+ */
+export async function writeCsv(outputDir, results, rubric) {
+  const criteriaIds = rubric.criteria.map(c => c.id);
+  const header = ['student', 'score', 'grade', 'status', ...criteriaIds, 'error'].join(',');
+
+  const rows = results.map(r => {
+    if (r.status === 'error') {
+      return [
+        csvField(r.student), '', '', 'error',
+        ...criteriaIds.map(() => ''),
+        csvField(r.error),
+      ].join(',');
+    }
+
+    const scoreMap = Object.fromEntries(
+      r.evaluation.criteria.map(c => [c.id, c.score])
+    );
+    return [
+      csvField(r.student),
+      r.evaluation.weightedScore,
+      csvField(r.evaluation.grade),
+      'ok',
+      ...criteriaIds.map(id => scoreMap[id] ?? ''),
+      '',
+    ].join(',');
+  });
+
+  const csv     = [header, ...rows].join('\n');
+  const csvPath = join(outputDir, 'results.csv');
+  await writeFile(csvPath, csv, 'utf8');
+  return csvPath;
+}
+
 /**
  * Ensure output/<student>/ directory exists and return its path.
  */
