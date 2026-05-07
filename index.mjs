@@ -76,9 +76,12 @@ async function main() {
   if (!existsSync(OUT_DIR)) mkdirSync(OUT_DIR, { recursive: true });
 
   // ── Load and validate rubric (before env-var check — no API needed for this)
-  const rubric = JSON.parse(
-    await readFile(join(__dirname, 'rubric.json'), 'utf8')
-  );
+  const rubricPath = join(__dirname, 'rubric.json');
+  if (!existsSync(rubricPath)) {
+    log.error('rubric.json not found in project root. Create it to define your evaluation criteria.');
+    process.exit(1);
+  }
+  const rubric = JSON.parse(await readFile(rubricPath, 'utf8'));
   try {
     validateRubric(rubric);
   } catch (err) {
@@ -147,6 +150,7 @@ async function main() {
   log.sep();
 
   // ── Process videos (bounded concurrency) ───────────────────────────────────
+  const batchStart = Date.now();
   const total = entries.length;
   const results = await runBatch(
     entries,
@@ -173,12 +177,14 @@ async function main() {
   const csvPath = await writeCsv(OUT_DIR, results, rubric);
 
   // ── Summary ─────────────────────────────────────────────────────────────────
-  const nOk    = results.filter(r => r.status === 'ok').length;
-  const nError = results.filter(r => r.status === 'error').length;
+  const nOk      = results.filter(r => r.status === 'ok').length;
+  const nError   = results.filter(r => r.status === 'error').length;
+  const elapsedS = ((Date.now() - batchStart) / 1000).toFixed(1);
 
   console.log('');
   log.info('════════════════════════════════════════════════════════');
   log.info(`SUMMARY   ${nOk} ok  /  ${nError} errors  /  ${results.length} total`);
+  log.info(`Elapsed   ${elapsedS}s`);
   log.info(`CSV       ${csvPath}`);
   log.info(`Output    ${OUT_DIR}`);
   log.info('════════════════════════════════════════════════════════');
