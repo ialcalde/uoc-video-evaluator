@@ -31,15 +31,15 @@ import Anthropic from '@anthropic-ai/sdk';
 import OpenAI    from 'openai';
 import * as dotenv from 'dotenv';
 import { existsSync, mkdirSync } from 'fs';
-import { readFile, unlink }            from 'fs/promises';
-import { basename, extname, join }     from 'path';
+import { readFile }                    from 'fs/promises';
+import { join }                        from 'path';
 import { fileURLToPath }               from 'url';
 
 import { validateRubric }    from './src/validate.mjs';
 import { processVideo }      from './src/pipeline.mjs';
 import { writeCsv }          from './src/report.mjs';
-import { collectLocalVideos } from './src/source.mjs';
-import { authorise, createDriveClient, listVideos, downloadVideo } from './src/drive.mjs';
+import { collectLocalVideos, collectDriveVideos } from './src/source.mjs';
+import { authorise, createDriveClient } from './src/drive.mjs';
 import { runBatch } from './src/batch.mjs';
 import { parseArgs } from './src/cli.mjs';
 
@@ -65,55 +65,6 @@ const log = {
   sep:   ()  => console.log( `        ${'─'.repeat(52)}`),
 };
 
-// ── Video source: Google Drive ────────────────────────────────────────────────
-async function collectDriveVideos(folderId) {
-  const auth  = await authorise(log);
-  const drive = createDriveClient(auth);
-
-  log.info(`[Drive] Listing videos in folder: ${folderId}`);
-  const files = await listVideos(folderId, drive);
-
-  if (files.length === 0) {
-    log.warn('[Drive] No video files found in the specified folder.');
-    return [];
-  }
-
-  log.info(`[Drive] Found ${files.length} video(s). Downloading to tmp/…`);
-  log.sep();
-
-  const entries = [];
-
-  for (const file of files) {
-    const student = basename(file.name, extname(file.name));
-    const destPath = join(TMP_DIR, file.name);
-    const sizeMB   = file.size ? (Number(file.size) / 1_048_576).toFixed(1) : '?';
-
-    log.info(`[Drive] Downloading "${file.name}" (${sizeMB} MB)…`);
-
-    let lastLogged = 0;
-    await downloadVideo(file.id, file.name, TMP_DIR, drive, bytes => {
-      const mb = bytes / 1_048_576;
-      if (mb - lastLogged >= 10) {        // log every 10 MB
-        log.info(`[Drive]   … ${mb.toFixed(0)} MB received`);
-        lastLogged = mb;
-      }
-    });
-
-    log.ok(`[Drive] "${file.name}" ready.`);
-
-    entries.push({
-      videoPath: destPath,
-      student,
-      cleanup: async () => {
-        try { await unlink(destPath); } catch { /* already gone */ }
-      },
-    });
-  }
-
-  log.sep();
-  return entries;
-}
-
 // ── Main ──────────────────────────────────────────────────────────────────────
 async function main() {
   const { driveFolderId, skipExisting, concurrency, outputDir, dryRun } =
@@ -138,7 +89,9 @@ async function main() {
 
   if (driveFolderId) {
     log.info(`Source: Google Drive (folder: ${driveFolderId})`);
-    entries = await collectDriveVideos(driveFolderId);
+    const auth  = await authorise(log);
+    const drive = createDriveClient(auth);
+    entries = await collectDriveVideos(driveFolderId, drive, { tmpDir: TMP_DIR, log });
   } else {
     log.info('Source: local input_videos/');
     entries = collectLocalVideos(INPUT_DIR);
