@@ -15,15 +15,16 @@
  *
  * Flags:
  *   --drive-folder <id>   Read videos from a Google Drive folder.
- *   --skip-existing       Skip students whose evaluation.json already exists
- *                         (useful to resume an interrupted run without re-billing).
+ *   --skip-existing       Skip students whose evaluation.json already exists.
  *   --concurrency <n>     Process up to N students in parallel (default: 3).
+ *   --output-dir <path>   Write results to a custom directory (default: output/).
+ *   --dry-run             List videos found without calling any API.
  *
  * Usage:
  *   node index.mjs
  *   node index.mjs --drive-folder 1AbCdEfGhIjKlMnOpQrStUvWxYz
- *   node index.mjs --skip-existing
- *   node index.mjs --concurrency 5
+ *   node index.mjs --skip-existing --concurrency 5
+ *   node index.mjs --dry-run
  */
 
 import Anthropic from '@anthropic-ai/sdk';
@@ -47,6 +48,7 @@ import {
 } from './src/report.mjs';
 import { authorise, createDriveClient, listVideos, downloadVideo } from './src/drive.mjs';
 import { runBatch } from './src/batch.mjs';
+import { parseArgs } from './src/cli.mjs';
 
 dotenv.config();
 
@@ -72,28 +74,6 @@ const log = {
   error: msg => console.error(`[ERROR] ${ts()}  ${msg}`),
   sep:   ()  => console.log( `        ${'─'.repeat(52)}`),
 };
-
-// ── CLI args ──────────────────────────────────────────────────────────────────
-function parseArgs(argv) {
-  const args   = argv.slice(2);
-  const opts   = {};
-
-  for (let i = 0; i < args.length; i++) {
-    if (args[i] === '--drive-folder' && args[i + 1]) {
-      opts.driveFolderId = args[++i];
-    } else if (args[i] === '--skip-existing') {
-      opts.skipExisting = true;
-    } else if (args[i] === '--concurrency' && args[i + 1]) {
-      opts.concurrency = Math.max(1, parseInt(args[++i], 10) || 1);
-    }
-  }
-
-  // env var fallback
-  opts.driveFolderId ??= process.env.GOOGLE_DRIVE_FOLDER_ID || null;
-  opts.skipExisting  ??= false;
-  opts.concurrency   ??= 3;
-  return opts;
-}
 
 // ── Video source: local ───────────────────────────────────────────────────────
 function collectLocalVideos() {
@@ -158,9 +138,9 @@ async function collectDriveVideos(folderId) {
 }
 
 // ── Single-video pipeline ─────────────────────────────────────────────────────
-async function processVideo(videoPath, student, anthropic, openai, rubric, skipExisting = false) {
+async function processVideo(videoPath, student, anthropic, openai, rubric, skipExisting = false, outDir = OUTPUT_DIR) {
   const audioPath  = join(TMP_DIR, `${student}_${Date.now()}.mp3`);
-  const studentDir = ensureStudentDir(OUTPUT_DIR, student);
+  const studentDir = ensureStudentDir(outDir, student);
   const evalPath   = join(studentDir, 'evaluation.json');
 
   if (skipExisting && existsSync(evalPath)) {
@@ -203,23 +183,13 @@ async function processVideo(videoPath, student, anthropic, openai, rubric, skipE
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 async function main() {
-  const { driveFolderId, skipExisting, concurrency } = parseArgs(process.argv);
+  const { driveFolderId, skipExisting, concurrency, outputDir, dryRun } =
+    parseArgs(process.argv);
 
-  // ── Required env vars ───────────────────────────────────────────────────────
-  const missingKeys = [];
-  if (!process.env.ANTHROPIC_API_KEY) missingKeys.push('ANTHROPIC_API_KEY');
-  if (!process.env.OPENAI_API_KEY)    missingKeys.push('OPENAI_API_KEY');
-  if (driveFolderId) {
-    if (!process.env.GOOGLE_CLIENT_ID)     missingKeys.push('GOOGLE_CLIENT_ID');
-    if (!process.env.GOOGLE_CLIENT_SECRET) missingKeys.push('GOOGLE_CLIENT_SECRET');
-  }
-  if (missingKeys.length) {
-    log.error(`Missing environment variables: ${missingKeys.join(', ')}`);
-    log.error('Copy .env.example to .env and fill in your keys.');
-    process.exit(1);
-  }
+  const OUT_DIR = outputDir ? outputDir : OUTPUT_DIR;
+  if (!existsSync(OUT_DIR)) mkdirSync(OUT_DIR, { recursive: true });
 
-  // ── Load and validate rubric ────────────────────────────────────────────────
+  // ── Load and validate rubric (before env-var check — no API needed for this)
   const rubric = JSON.parse(
     await readFile(join(__dirname, 'rubric.json'), 'utf8')
   );
@@ -229,10 +199,6 @@ async function main() {
     log.error(`Invalid rubric.json: ${err.message}`);
     process.exit(1);
   }
-
-  // ── Init API clients ────────────────────────────────────────────────────────
-  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-  const openai    = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
   // ── Collect videos ──────────────────────────────────────────────────────────
   let entries;
@@ -253,16 +219,46 @@ async function main() {
     process.exit(0);
   }
 
+  // ── Dry-run: list found videos and exit without calling any API ─────────────
+  if (dryRun) {
+    log.info(`[DRY RUN] Found ${entries.length} video(s):`);
+    for (const { student, videoPath } of entries) {
+      log.info(`  ${student.padEnd(30)} ${videoPath}`);
+    }
+    log.info('[DRY RUN] No API calls made. Remove --dry-run to process.');
+    process.exit(0);
+  }
+
+  // ── Required env vars ───────────────────────────────────────────────────────
+  const missingKeys = [];
+  if (!process.env.ANTHROPIC_API_KEY) missingKeys.push('ANTHROPIC_API_KEY');
+  if (!process.env.OPENAI_API_KEY)    missingKeys.push('OPENAI_API_KEY');
+  if (driveFolderId) {
+    if (!process.env.GOOGLE_CLIENT_ID)     missingKeys.push('GOOGLE_CLIENT_ID');
+    if (!process.env.GOOGLE_CLIENT_SECRET) missingKeys.push('GOOGLE_CLIENT_SECRET');
+  }
+  if (missingKeys.length) {
+    log.error(`Missing environment variables: ${missingKeys.join(', ')}`);
+    log.error('Copy .env.example to .env and fill in your keys.');
+    process.exit(1);
+  }
+
+  // ── Init API clients ────────────────────────────────────────────────────────
+  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const openai    = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
   log.info(`Processing ${entries.length} video(s) — concurrency: ${concurrency}`);
   log.sep();
 
   // ── Process videos (bounded concurrency) ───────────────────────────────────
+  const total = entries.length;
   const results = await runBatch(
     entries,
-    async ({ videoPath, student, cleanup }) => {
+    async ({ videoPath, student, cleanup }, idx) => {
+      log.info(`[${idx + 1}/${total}] Starting ${student}`);
       try {
         const evaluation = await processVideo(
-          videoPath, student, anthropic, openai, rubric, skipExisting
+          videoPath, student, anthropic, openai, rubric, skipExisting, OUT_DIR
         );
         return { student, status: 'ok', evaluation };
       } catch (err) {
@@ -277,7 +273,7 @@ async function main() {
   );
 
   // ── Write CSV ───────────────────────────────────────────────────────────────
-  const csvPath = await writeCsv(OUTPUT_DIR, results, rubric);
+  const csvPath = await writeCsv(OUT_DIR, results, rubric);
 
   // ── Summary ─────────────────────────────────────────────────────────────────
   const nOk    = results.filter(r => r.status === 'ok').length;
@@ -287,7 +283,7 @@ async function main() {
   log.info('════════════════════════════════════════════════════════');
   log.info(`SUMMARY   ${nOk} ok  /  ${nError} errors  /  ${results.length} total`);
   log.info(`CSV       ${csvPath}`);
-  log.info(`Output    ${OUTPUT_DIR}`);
+  log.info(`Output    ${OUT_DIR}`);
   log.info('════════════════════════════════════════════════════════');
 }
 
