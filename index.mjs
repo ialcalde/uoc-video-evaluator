@@ -37,6 +37,7 @@ import { fileURLToPath }               from 'url';
 import { extractAudio }   from './src/audio.mjs';
 import { transcribe }     from './src/transcribe.mjs';
 import { evaluate }       from './src/evaluate.mjs';
+import { validateRubric } from './src/validate.mjs';
 import {
   ensureStudentDir,
   writeTranscript,
@@ -44,7 +45,7 @@ import {
   writeFeedback,
   writeCsv,
 } from './src/report.mjs';
-import { authorise, listVideos, downloadVideo } from './src/drive.mjs';
+import { authorise, createDriveClient, listVideos, downloadVideo } from './src/drive.mjs';
 import { runBatch } from './src/batch.mjs';
 
 dotenv.config();
@@ -109,10 +110,11 @@ function collectLocalVideos() {
 
 // ── Video source: Google Drive ────────────────────────────────────────────────
 async function collectDriveVideos(folderId) {
-  const auth = await authorise(log);
+  const auth  = await authorise(log);
+  const drive = createDriveClient(auth);
 
   log.info(`[Drive] Listing videos in folder: ${folderId}`);
-  const files = await listVideos(folderId, auth);
+  const files = await listVideos(folderId, drive);
 
   if (files.length === 0) {
     log.warn('[Drive] No video files found in the specified folder.');
@@ -132,7 +134,7 @@ async function collectDriveVideos(folderId) {
     log.info(`[Drive] Downloading "${file.name}" (${sizeMB} MB)…`);
 
     let lastLogged = 0;
-    await downloadVideo(file.id, file.name, TMP_DIR, auth, bytes => {
+    await downloadVideo(file.id, file.name, TMP_DIR, drive, bytes => {
       const mb = bytes / 1_048_576;
       if (mb - lastLogged >= 10) {        // log every 10 MB
         log.info(`[Drive]   … ${mb.toFixed(0)} MB received`);
@@ -217,10 +219,16 @@ async function main() {
     process.exit(1);
   }
 
-  // ── Load rubric ─────────────────────────────────────────────────────────────
+  // ── Load and validate rubric ────────────────────────────────────────────────
   const rubric = JSON.parse(
     await readFile(join(__dirname, 'rubric.json'), 'utf8')
   );
+  try {
+    validateRubric(rubric);
+  } catch (err) {
+    log.error(`Invalid rubric.json: ${err.message}`);
+    process.exit(1);
+  }
 
   // ── Init API clients ────────────────────────────────────────────────────────
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });

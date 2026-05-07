@@ -166,13 +166,20 @@ export async function authorise(log) {
 // ── Drive operations ──────────────────────────────────────────────────────────
 
 /**
+ * Create a google.drive v3 client from an authenticated OAuth2 client.
+ * Call once after authorise() and pass the result to listVideos / downloadVideo.
+ */
+export function createDriveClient(auth) {
+  return google.drive({ version: 'v3', auth });
+}
+
+/**
  * List all video files inside a Drive folder (non-recursive).
  * @param {string} folderId  Google Drive folder ID.
- * @param {object} auth      Authenticated OAuth2 client.
+ * @param {object} drive     google.drive v3 client (from createDriveClient).
  * @returns {Promise<Array<{id:string, name:string, size:string}>>}
  */
-export async function listVideos(folderId, auth) {
-  const drive     = google.drive({ version: 'v3', auth });
+export async function listVideos(folderId, drive) {
   const mimeQuery = VIDEO_MIMES.map(m => `mimeType='${m}'`).join(' or ');
 
   const res = await drive.files.list({
@@ -189,15 +196,14 @@ export async function listVideos(folderId, auth) {
 
 /**
  * Download a single Drive file to destDir.
- * @param {string}   fileId   Drive file ID.
- * @param {string}   fileName Original filename (used for the local copy).
- * @param {string}   destDir  Directory to write the file into.
- * @param {object}   auth     Authenticated OAuth2 client.
- * @param {Function} onProgress  Optional callback: (bytesDownloaded) => void
- * @returns {Promise<string>} Absolute path to the downloaded file.
+ * @param {string}   fileId     Drive file ID.
+ * @param {string}   fileName   Original filename (used for the local copy).
+ * @param {string}   destDir    Directory to write the file into.
+ * @param {object}   drive      google.drive v3 client (from createDriveClient).
+ * @param {Function} onProgress Optional callback: (bytesDownloaded) => void
+ * @returns {Promise<string>}   Absolute path to the downloaded file.
  */
-export async function downloadVideo(fileId, fileName, destDir, auth, onProgress) {
-  const drive    = google.drive({ version: 'v3', auth });
+export async function downloadVideo(fileId, fileName, destDir, drive, onProgress) {
   const destPath = join(destDir, fileName);
 
   const response = await drive.files.get(

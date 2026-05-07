@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node index.mjs",
     "evaluate": "node index.mjs",
-    "test": "node --test test/validate.test.mjs test/evaluate.test.mjs test/report.test.mjs test/transcribe.test.mjs test/audio.test.mjs test/batch.test.mjs"
+    "test": "node --test test/validate.test.mjs test/evaluate.test.mjs test/report.test.mjs test/transcribe.test.mjs test/audio.test.mjs test/batch.test.mjs test/retry.test.mjs test/drive.test.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.37.0",

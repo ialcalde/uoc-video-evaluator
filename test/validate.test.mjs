@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { validateEvaluation } from '../src/validate.mjs';
+import { validateEvaluation, validateRubric } from '../src/validate.mjs';
 import { mockRubric, validEvaluation } from './fixtures.mjs';
 
 // Helper: serialize to JSON string (what Claude actually returns)
@@ -161,4 +161,64 @@ describe('validateEvaluation', () => {
       /weightedScore.*number/i
     );
   });
+});
+
+// ── validateRubric ────────────────────────────────────────────────────────────
+
+describe('validateRubric', () => {
+
+  it('returns the rubric object when input is valid', () => {
+    const result = validateRubric(mockRubric);
+    assert.equal(result, mockRubric);
+  });
+
+  it('throws when rubric is not an object', () => {
+    assert.throws(() => validateRubric(null),        /must be a JSON object/i);
+    assert.throws(() => validateRubric('string'),    /must be a JSON object/i);
+    assert.throws(() => validateRubric([]),          /must be a JSON object/i);
+  });
+
+  it('throws when title is missing or empty', () => {
+    assert.throws(() => validateRubric({ ...mockRubric, title: '' }),     /title/i);
+    assert.throws(() => validateRubric({ ...mockRubric, title: 42 }),     /title/i);
+    const { title: _, ...noTitle } = mockRubric;
+    assert.throws(() => validateRubric(noTitle),                           /title/i);
+  });
+
+  it('throws when criteria is missing or empty', () => {
+    assert.throws(() => validateRubric({ ...mockRubric, criteria: [] }),  /non-empty array/i);
+    assert.throws(() => validateRubric({ ...mockRubric, criteria: null }), /non-empty array/i);
+  });
+
+  it('throws when a criterion is missing its id', () => {
+    const bad = { ...mockRubric, criteria: [{ ...mockRubric.criteria[0], id: '' }, mockRubric.criteria[1]] };
+    assert.throws(() => validateRubric(bad), /missing.*id/i);
+  });
+
+  it('throws when a criterion weight is 0 or greater than 1', () => {
+    const zeroWeight = { ...mockRubric, criteria: [{ ...mockRubric.criteria[0], weight: 0 }, mockRubric.criteria[1]] };
+    assert.throws(() => validateRubric(zeroWeight), /weight/i);
+
+    const tooBig = { ...mockRubric, criteria: [{ ...mockRubric.criteria[0], weight: 1.5 }, mockRubric.criteria[1]] };
+    assert.throws(() => validateRubric(tooBig), /weight/i);
+  });
+
+  it('throws when weights do not sum to 1', () => {
+    const bad = {
+      ...mockRubric,
+      criteria: mockRubric.criteria.map(c => ({ ...c, weight: 0.3 })),  // 0.3 + 0.3 = 0.6
+    };
+    assert.throws(() => validateRubric(bad), /weights sum/i);
+  });
+
+  it('throws when a criterion is missing levels', () => {
+    const bad = { ...mockRubric, criteria: [{ ...mockRubric.criteria[0], levels: [] }, mockRubric.criteria[1]] };
+    assert.throws(() => validateRubric(bad), /levels/i);
+  });
+
+  it('throws when gradingScale is missing or empty', () => {
+    assert.throws(() => validateRubric({ ...mockRubric, gradingScale: [] }),  /gradingScale/i);
+    assert.throws(() => validateRubric({ ...mockRubric, gradingScale: null }), /gradingScale/i);
+  });
+
 });

@@ -1,4 +1,5 @@
 import { validateEvaluation } from './validate.mjs';
+import { withRetry } from './retry.mjs';
 
 const SYSTEM_PROMPT =
   `Ets un avaluador acadèmic expert de la Universitat Oberta de Catalunya (UOC).
@@ -89,24 +90,26 @@ export async function evaluate(transcript, rubric, anthropic) {
     { type: 'text', text: buildTranscriptBlock(transcript, rubric) },
   ];
 
-  // ── First attempt ────────────────────────────────────────────────────────
-  const first = await anthropic.messages.create({
+  const callParams = {
     model:      'claude-sonnet-4-6',
     max_tokens: 2048,
     system:     systemConfig,
-    messages:   [{ role: 'user', content: userContent }],
-  });
+  };
+
+  // ── First attempt (with HTTP-error retry) ────────────────────────────────
+  const first = await withRetry(() => anthropic.messages.create({
+    ...callParams,
+    messages: [{ role: 'user', content: userContent }],
+  }));
 
   const rawFirst = first.content[0].text.trim();
 
   try {
     return validateEvaluation(rawFirst, rubric);
   } catch (firstError) {
-    // ── Single retry — reuse same systemConfig/userContent to preserve cache key
-    const retry = await anthropic.messages.create({
-      model:      'claude-sonnet-4-6',
-      max_tokens: 2048,
-      system:     systemConfig,
+    // ── Schema-correction retry — reuse systemConfig/userContent for cache hit
+    const retry = await withRetry(() => anthropic.messages.create({
+      ...callParams,
       messages: [
         { role: 'user',      content: userContent },
         { role: 'assistant', content: rawFirst    },
@@ -118,7 +121,7 @@ export async function evaluate(transcript, rubric, anthropic) {
             `Sense text addicional, sense blocs markdown.`,
         },
       ],
-    });
+    }));
 
     const rawRetry = retry.content[0].text.trim();
     return validateEvaluation(rawRetry, rubric);
