@@ -17,11 +17,13 @@
  *   --drive-folder <id>   Read videos from a Google Drive folder.
  *   --skip-existing       Skip students whose evaluation.json already exists
  *                         (useful to resume an interrupted run without re-billing).
+ *   --concurrency <n>     Process up to N students in parallel (default: 3).
  *
  * Usage:
  *   node index.mjs
  *   node index.mjs --drive-folder 1AbCdEfGhIjKlMnOpQrStUvWxYz
  *   node index.mjs --skip-existing
+ *   node index.mjs --concurrency 5
  */
 
 import Anthropic from '@anthropic-ai/sdk';
@@ -43,6 +45,7 @@ import {
   writeCsv,
 } from './src/report.mjs';
 import { authorise, listVideos, downloadVideo } from './src/drive.mjs';
+import { runBatch } from './src/batch.mjs';
 
 dotenv.config();
 
@@ -79,12 +82,15 @@ function parseArgs(argv) {
       opts.driveFolderId = args[++i];
     } else if (args[i] === '--skip-existing') {
       opts.skipExisting = true;
+    } else if (args[i] === '--concurrency' && args[i + 1]) {
+      opts.concurrency = Math.max(1, parseInt(args[++i], 10) || 1);
     }
   }
 
   // env var fallback
   opts.driveFolderId ??= process.env.GOOGLE_DRIVE_FOLDER_ID || null;
   opts.skipExisting  ??= false;
+  opts.concurrency   ??= 3;
   return opts;
 }
 
@@ -195,7 +201,7 @@ async function processVideo(videoPath, student, anthropic, openai, rubric, skipE
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 async function main() {
-  const { driveFolderId, skipExisting } = parseArgs(process.argv);
+  const { driveFolderId, skipExisting, concurrency } = parseArgs(process.argv);
 
   // ── Required env vars ───────────────────────────────────────────────────────
   const missingKeys = [];
@@ -239,26 +245,28 @@ async function main() {
     process.exit(0);
   }
 
-  log.info(`Processing ${entries.length} video(s)…`);
+  log.info(`Processing ${entries.length} video(s) — concurrency: ${concurrency}`);
   log.sep();
 
-  // ── Process each video ──────────────────────────────────────────────────────
-  const results = [];
-
-  for (const { videoPath, student, cleanup } of entries) {
-    try {
-      const evaluation = await processVideo(
-        videoPath, student, anthropic, openai, rubric, skipExisting
-      );
-      results.push({ student, status: 'ok', evaluation });
-    } catch (err) {
-      log.error(`[${student}] Failed: ${err.message}`);
-      results.push({ student, status: 'error', error: err.message });
-    } finally {
-      await cleanup?.();     // remove Drive-downloaded file after processing
-    }
-    log.sep();
-  }
+  // ── Process videos (bounded concurrency) ───────────────────────────────────
+  const results = await runBatch(
+    entries,
+    async ({ videoPath, student, cleanup }) => {
+      try {
+        const evaluation = await processVideo(
+          videoPath, student, anthropic, openai, rubric, skipExisting
+        );
+        return { student, status: 'ok', evaluation };
+      } catch (err) {
+        log.error(`[${student}] Failed: ${err.message}`);
+        return { student, status: 'error', error: err.message };
+      } finally {
+        await cleanup?.();    // remove Drive-downloaded file after processing
+        log.sep();
+      }
+    },
+    concurrency
+  );
 
   // ── Write CSV ───────────────────────────────────────────────────────────────
   const csvPath = await writeCsv(OUTPUT_DIR, results, rubric);
