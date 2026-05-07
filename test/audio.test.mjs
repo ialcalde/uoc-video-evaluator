@@ -10,10 +10,10 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { execSync } from 'child_process';
-import { writeFileSync, mkdtempSync, rmSync } from 'fs';
+import { writeFileSync, mkdtempSync, rmSync, statSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { extractAudio } from '../src/audio.mjs';
+import { extractAudio, MAX_AUDIO_BYTES } from '../src/audio.mjs';
 
 // Detect ffmpeg once for the whole suite
 const FFMPEG_AVAILABLE = (() => {
@@ -57,7 +57,6 @@ describe('extractAudio', () => {
   it('resolves with the output audio path on a valid video file', { skip: !FFMPEG_AVAILABLE }, async () => {
     const tmp = mkdtempSync(join(tmpdir(), 'uoc-audio-test-'));
     try {
-      // Generate a 1-second silent video with ffmpeg itself
       const videoPath = join(tmp, 'input.mp4');
       const audioPath = join(tmp, 'output.mp3');
 
@@ -68,13 +67,58 @@ describe('extractAudio', () => {
 
       const result = await extractAudio(videoPath, audioPath);
       assert.equal(result, audioPath);
-
-      // Verify the output file exists and has content
-      const { statSync } = await import('fs');
-      const stat = statSync(audioPath);
-      assert.ok(stat.size > 0, 'output audio file should not be empty');
+      assert.ok(statSync(audioPath).size > 0, 'output audio file should not be empty');
     } finally {
       rmSync(tmp, { recursive: true, force: true });
     }
+  });
+
+  // ── Size guard (mocked ffmpegFn — no real ffmpeg needed) ─────────────────────
+
+  it('does not re-encode when file size is under the limit', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'uoc-audio-test-'));
+    try {
+      const audioPath = join(tmp, 'audio.mp3');
+      let calls = 0;
+
+      const mockFfmpeg = async (_src, dest) => {
+        calls++;
+        writeFileSync(dest, Buffer.alloc(1024));   // tiny file — under limit
+      };
+
+      await extractAudio('/fake/video.mp4', audioPath, { ffmpegFn: mockFfmpeg });
+
+      assert.equal(calls, 1, 'should only run ffmpeg once when file is small enough');
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it('re-encodes at lower bitrate when file exceeds MAX_AUDIO_BYTES', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'uoc-audio-test-'));
+    try {
+      const audioPath = join(tmp, 'audio.mp3');
+      let calls = 0;
+      const capturedFlags = [];
+
+      const mockFfmpeg = async (_src, dest, flags) => {
+        calls++;
+        capturedFlags.push([...flags]);
+        // First call: write an oversized file; second call: write a small one
+        writeFileSync(dest, Buffer.alloc(calls === 1 ? MAX_AUDIO_BYTES + 1 : 1024));
+      };
+
+      await extractAudio('/fake/video.mp4', audioPath, { ffmpegFn: mockFfmpeg });
+
+      assert.equal(calls, 2, 'should run ffmpeg twice when first output is too large');
+      assert.ok(capturedFlags[1].includes('-b:a'), 'second pass should use -b:a flag');
+      assert.ok(capturedFlags[1].includes('32k'),  'second pass should target 32 kbps');
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it('MAX_AUDIO_BYTES is exported and equals 24 MB', () => {
+    assert.equal(MAX_AUDIO_BYTES, 24 * 1024 * 1024);
   });
 });
