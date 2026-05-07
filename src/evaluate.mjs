@@ -104,7 +104,9 @@ export async function evaluate(transcript, rubric, anthropic, { model = 'claude-
     }).finalMessage()
   );
 
-  const rawFirst = first.content[0].text.trim();
+  const firstText = first.content.find(b => b.type === 'text');
+  if (!firstText) throw new Error('Claude returned no text content in first attempt');
+  const rawFirst = firstText.text.trim();
 
   try {
     return validateEvaluation(rawFirst, rubric);
@@ -125,7 +127,9 @@ export async function evaluate(transcript, rubric, anthropic, { model = 'claude-
       ],
     }));
 
-    const rawRetry = retry.content[0].text.trim();
+    const retryText = retry.content.find(b => b.type === 'text');
+    if (!retryText) throw new Error('Claude returned no text content in schema-correction retry');
+    const rawRetry = retryText.text.trim();
     return validateEvaluation(rawRetry, rubric);
   }
 }

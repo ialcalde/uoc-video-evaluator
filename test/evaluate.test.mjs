@@ -7,7 +7,7 @@ import { mockRubric, validEvaluation } from './fixtures.mjs';
 // First call goes through stream().finalMessage(); retries go through create().
 function makeClient(...responses) {
   let call = 0;
-  const next = () => ({ content: [{ text: responses[Math.min(call++, responses.length - 1)] }] });
+  const next = () => ({ content: [{ type: 'text', text: responses[Math.min(call++, responses.length - 1)] }] });
   return {
     messages: {
       stream:  ()    => ({ finalMessage: async () => next() }),
@@ -67,10 +67,10 @@ describe('evaluate', () => {
         stream: ({ messages }) => ({
           finalMessage: async () => {
             capturedMessages = messages;
-            return { content: [{ text: JSON.stringify(validEvaluation) }] };
+            return { content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] };
           },
         }),
-        create: async () => ({ content: [{ text: JSON.stringify(validEvaluation) }] }),
+        create: async () => ({ content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] }),
       },
     };
 
@@ -83,6 +83,25 @@ describe('evaluate', () => {
     assert.ok(fullText.includes(mockRubric.title),    'rubric title should appear in the prompt');
   });
 
+  it('handles a thinking block before the text block (extended thinking)', async () => {
+    const client = {
+      messages: {
+        stream: () => ({
+          finalMessage: async () => ({
+            content: [
+              { type: 'thinking', thinking: 'Let me consider the criteria...' },
+              { type: 'text', text: JSON.stringify(validEvaluation) },
+            ],
+          }),
+        }),
+        create: async () => ({ content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] }),
+      },
+    };
+
+    const result = await evaluate(mockTranscript, mockRubric, client);
+    assert.equal(result.weightedScore, validEvaluation.weightedScore);
+  });
+
   it('forwards the model option to the API call', async () => {
     let capturedModel;
     const client = {
@@ -90,10 +109,10 @@ describe('evaluate', () => {
         stream: (params) => ({
           finalMessage: async () => {
             capturedModel = params.model;
-            return { content: [{ text: JSON.stringify(validEvaluation) }] };
+            return { content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] };
           },
         }),
-        create: async () => ({ content: [{ text: JSON.stringify(validEvaluation) }] }),
+        create: async () => ({ content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] }),
       },
     };
 
@@ -108,10 +127,10 @@ describe('evaluate', () => {
         stream: (params) => ({
           finalMessage: async () => {
             capturedParams = params;
-            return { content: [{ text: JSON.stringify(validEvaluation) }] };
+            return { content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] };
           },
         }),
-        create: async () => ({ content: [{ text: JSON.stringify(validEvaluation) }] }),
+        create: async () => ({ content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] }),
       },
     };
 

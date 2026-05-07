@@ -16,7 +16,7 @@ function makeTranscribe(text = 'Hola, sóc estudiant de la UOC.') {
 }
 
 function makeAnthropic() {
-  const msg = () => ({ content: [{ text: JSON.stringify(validEvaluation) }] });
+  const msg = () => ({ content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] });
   return {
     messages: {
       stream:  () => ({ finalMessage: async () => msg() }),
