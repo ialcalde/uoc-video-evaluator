@@ -30,14 +30,15 @@
 import Anthropic from '@anthropic-ai/sdk';
 import OpenAI    from 'openai';
 import * as dotenv from 'dotenv';
-import { readdirSync, existsSync, mkdirSync } from 'fs';
+import { existsSync, mkdirSync } from 'fs';
 import { readFile, unlink }            from 'fs/promises';
 import { basename, extname, join }     from 'path';
 import { fileURLToPath }               from 'url';
 
-import { validateRubric } from './src/validate.mjs';
-import { processVideo }   from './src/pipeline.mjs';
-import { writeCsv }       from './src/report.mjs';
+import { validateRubric }    from './src/validate.mjs';
+import { processVideo }      from './src/pipeline.mjs';
+import { writeCsv }          from './src/report.mjs';
+import { collectLocalVideos } from './src/source.mjs';
 import { authorise, createDriveClient, listVideos, downloadVideo } from './src/drive.mjs';
 import { runBatch } from './src/batch.mjs';
 import { parseArgs } from './src/cli.mjs';
@@ -54,9 +55,6 @@ for (const dir of [INPUT_DIR, OUTPUT_DIR, TMP_DIR]) {
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
 }
 
-// ── Local video extensions ────────────────────────────────────────────────────
-const VIDEO_EXTS = new Set(['.mp4', '.mov', '.mkv', '.avi', '.webm']);
-
 // ── Logger ────────────────────────────────────────────────────────────────────
 function ts() { return new Date().toISOString().slice(11, 19); }
 const log = {
@@ -66,19 +64,6 @@ const log = {
   error: msg => console.error(`[ERROR] ${ts()}  ${msg}`),
   sep:   ()  => console.log( `        ${'─'.repeat(52)}`),
 };
-
-// ── Video source: local ───────────────────────────────────────────────────────
-function collectLocalVideos() {
-  const files = readdirSync(INPUT_DIR)
-    .filter(f => VIDEO_EXTS.has(extname(f).toLowerCase()))
-    .sort();
-
-  return files.map(f => ({
-    videoPath: join(INPUT_DIR, f),
-    student:   basename(f, extname(f)),
-    cleanup:   null,           // nothing to clean up for local files
-  }));
-}
 
 // ── Video source: Google Drive ────────────────────────────────────────────────
 async function collectDriveVideos(folderId) {
@@ -156,7 +141,7 @@ async function main() {
     entries = await collectDriveVideos(driveFolderId);
   } else {
     log.info('Source: local input_videos/');
-    entries = collectLocalVideos();
+    entries = collectLocalVideos(INPUT_DIR);
   }
 
   if (entries.length === 0) {
