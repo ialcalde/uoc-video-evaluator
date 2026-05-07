@@ -1,18 +1,18 @@
 import { validateEvaluation } from './validate.mjs';
 import { withRetry } from './retry.mjs';
 
-const SYSTEM_PROMPT =
-  `Ets un avaluador acadèmic expert de la Universitat Oberta de Catalunya (UOC).
+function buildSystemPrompt(lang) {
+  return `Ets un avaluador acadèmic expert de la Universitat Oberta de Catalunya (UOC).
 Avalues presentacions de vídeo d'estudiants amb la rúbrica proporcionada.
-IMPORTANT: Totes les justificacions i el camp overallFeedback han d'estar escrits en CATALÀ.
+IMPORTANT: All justifications and the overallFeedback field MUST be written in the language with BCP-47 code "${lang}".
 Retorna ÚNICAMENT un objecte JSON vàlid — sense blocs markdown, sense text addicional.`;
+}
 
 /**
  * Build the static rubric block (criteria + scale + instructions + schema).
  * Identical across all students in a batch run — eligible for prompt caching.
  */
-function buildRubricBlock(rubric) {
-  const lang = rubric.feedbackLanguage || 'ca';
+function buildRubricBlock(rubric, lang) {
 
   const criteriaBlock = rubric.criteria.map(c =>
     `### ${c.id} — ${c.nameEn} (pes: ${c.weight}, màx 10 pts)\n` +
@@ -35,7 +35,7 @@ ${rubric.gradingScale.map(g => `${g.min}–${g.max}: ${g.label}`).join('\n')}
 Avalua la transcripció contra cada criteri de la rúbrica.
 Per cada criteri proporciona:
 - score: número 0–10
-- justification: 2–4 frases en CATALÀ amb evidències específiques de la transcripció
+- justification: 2–4 sentences in "${lang}" with specific evidence from the transcript
 
 Després calcula:
 - weightedScore: suma de (score × weight) per a tots els criteris, arrodonit a 2 decimals
@@ -52,12 +52,12 @@ Retorna exactament aquest format JSON:
       "name": "<nom en anglès>",
       "weight": <number>,
       "score": <number 0-10>,
-      "justification": "<text en CATALÀ>"
+      "justification": "<text in ${lang}>"
     }
   ],
   "weightedScore": <number>,
   "grade": "<string>",
-  "overallFeedback": "<resum de 3–5 frases en CATALÀ amb un punt fort i una àrea de millora>"
+  "overallFeedback": "<3–5 sentences in ${lang}: one strength and one area for improvement>"
 }`;
 }
 
@@ -65,7 +65,7 @@ Retorna exactament aquest format JSON:
  * Build the per-student transcript block. Changes every call — not cached.
  */
 function buildTranscriptBlock(transcript, rubric) {
-  const lang = rubric.feedbackLanguage || 'ca';
+  const lang = rubric.language || rubric.feedbackLanguage || 'ca';
   return `# Transcripció (idioma: ${lang})\n${transcript.text}`;
 }
 
@@ -82,11 +82,13 @@ function buildTranscriptBlock(transcript, rubric) {
  * @returns {Promise<object>}           Validated evaluation object.
  */
 export async function evaluate(transcript, rubric, anthropic, { model = 'claude-sonnet-4-6', thinking = false } = {}) {
+  const lang = rubric.feedbackLanguage || 'ca';
+
   const systemConfig = [
-    { type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } },
+    { type: 'text', text: buildSystemPrompt(lang), cache_control: { type: 'ephemeral' } },
   ];
   const userContent = [
-    { type: 'text', text: buildRubricBlock(rubric),           cache_control: { type: 'ephemeral' } },
+    { type: 'text', text: buildRubricBlock(rubric, lang),     cache_control: { type: 'ephemeral' } },
     { type: 'text', text: buildTranscriptBlock(transcript, rubric) },
   ];
 
