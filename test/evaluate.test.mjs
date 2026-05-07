@@ -73,8 +73,35 @@ describe('evaluate', () => {
 
     await evaluate(mockTranscript, mockRubric, client);
 
-    const prompt = capturedMessages[0].content;
-    assert.ok(prompt.includes(mockTranscript.text), 'transcript should appear in the prompt');
-    assert.ok(prompt.includes(mockRubric.title), 'rubric title should appear in the prompt');
+    const content = capturedMessages[0].content;
+    assert.ok(Array.isArray(content), 'content should be an array of blocks');
+    const fullText = content.map(b => b.text).join(' ');
+    assert.ok(fullText.includes(mockTranscript.text), 'transcript should appear in the prompt');
+    assert.ok(fullText.includes(mockRubric.title),    'rubric title should appear in the prompt');
+  });
+
+  it('sets cache_control on rubric block and system prompt, not on transcript block', async () => {
+    let capturedParams;
+    const client = {
+      messages: {
+        create: async (params) => {
+          capturedParams = params;
+          return { content: [{ text: JSON.stringify(validEvaluation) }] };
+        },
+      },
+    };
+
+    await evaluate(mockTranscript, mockRubric, client);
+
+    // System must be an array with cache_control on the first (only) block
+    const system = capturedParams.system;
+    assert.ok(Array.isArray(system), 'system should be an array');
+    assert.deepEqual(system[0].cache_control, { type: 'ephemeral' });
+
+    // User content: first block = rubric (cached), last block = transcript (not cached)
+    const content = capturedParams.messages[0].content;
+    assert.ok(Array.isArray(content), 'user content should be an array');
+    assert.deepEqual(content[0].cache_control, { type: 'ephemeral' }, 'rubric block should be cached');
+    assert.ok(!content[content.length - 1].cache_control,             'transcript block should not be cached');
   });
 });

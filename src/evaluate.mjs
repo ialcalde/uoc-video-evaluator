@@ -7,9 +7,10 @@ IMPORTANT: Totes les justificacions i el camp overallFeedback han d'estar escrit
 Retorna ÚNICAMENT un objecte JSON vàlid — sense blocs markdown, sense text addicional.`;
 
 /**
- * Build the user prompt from transcript + rubric.
+ * Build the static rubric block (criteria + scale + instructions + schema).
+ * Identical across all students in a batch run — eligible for prompt caching.
  */
-function buildPrompt(transcript, rubric) {
+function buildRubricBlock(rubric) {
   const lang = rubric.feedbackLanguage || 'ca';
 
   const criteriaBlock = rubric.criteria.map(c =>
@@ -27,11 +28,6 @@ ${criteriaBlock}
 
 # Escala de qualificació
 ${rubric.gradingScale.map(g => `${g.min}–${g.max}: ${g.label}`).join('\n')}
-
----
-
-# Transcripció (idioma: ${lang})
-${transcript.text}
 
 ---
 
@@ -65,8 +61,19 @@ Retorna exactament aquest format JSON:
 }
 
 /**
+ * Build the per-student transcript block. Changes every call — not cached.
+ */
+function buildTranscriptBlock(transcript, rubric) {
+  const lang = rubric.feedbackLanguage || 'ca';
+  return `# Transcripció (idioma: ${lang})\n${transcript.text}`;
+}
+
+/**
  * Evaluate a transcript against the rubric using Claude.
  * Retries once if the returned JSON fails validation.
+ *
+ * The rubric block and system prompt carry cache_control so they are reused
+ * across students in the same batch run, saving input tokens.
  *
  * @param {{text: string}} transcript   Whisper transcription object.
  * @param {object}         rubric       Parsed rubric.json.
@@ -74,14 +81,20 @@ Retorna exactament aquest format JSON:
  * @returns {Promise<object>}           Validated evaluation object.
  */
 export async function evaluate(transcript, rubric, anthropic) {
-  const userPrompt = buildPrompt(transcript, rubric);
+  const systemConfig = [
+    { type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } },
+  ];
+  const userContent = [
+    { type: 'text', text: buildRubricBlock(rubric),           cache_control: { type: 'ephemeral' } },
+    { type: 'text', text: buildTranscriptBlock(transcript, rubric) },
+  ];
 
   // ── First attempt ────────────────────────────────────────────────────────
   const first = await anthropic.messages.create({
     model:      'claude-sonnet-4-6',
     max_tokens: 2048,
-    system:     SYSTEM_PROMPT,
-    messages:   [{ role: 'user', content: userPrompt }],
+    system:     systemConfig,
+    messages:   [{ role: 'user', content: userContent }],
   });
 
   const rawFirst = first.content[0].text.trim();
@@ -89,14 +102,14 @@ export async function evaluate(transcript, rubric, anthropic) {
   try {
     return validateEvaluation(rawFirst, rubric);
   } catch (firstError) {
-    // ── Single retry with correction context ─────────────────────────────
+    // ── Single retry — reuse same systemConfig/userContent to preserve cache key
     const retry = await anthropic.messages.create({
       model:      'claude-sonnet-4-6',
       max_tokens: 2048,
-      system:     SYSTEM_PROMPT,
+      system:     systemConfig,
       messages: [
-        { role: 'user',      content: userPrompt },
-        { role: 'assistant', content: rawFirst   },
+        { role: 'user',      content: userContent },
+        { role: 'assistant', content: rawFirst    },
         {
           role: 'user',
           content:
@@ -108,7 +121,6 @@ export async function evaluate(transcript, rubric, anthropic) {
     });
 
     const rawRetry = retry.content[0].text.trim();
-    // Let any validation error here propagate — the caller will catch it
     return validateEvaluation(rawRetry, rubric);
   }
 }
