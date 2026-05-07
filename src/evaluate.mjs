@@ -81,7 +81,7 @@ function buildTranscriptBlock(transcript, rubric) {
  * @param {import('@anthropic-ai/sdk').default} anthropic  Initialised Anthropic client.
  * @returns {Promise<object>}           Validated evaluation object.
  */
-export async function evaluate(transcript, rubric, anthropic) {
+export async function evaluate(transcript, rubric, anthropic, { model = 'claude-sonnet-4-6' } = {}) {
   const systemConfig = [
     { type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } },
   ];
@@ -91,7 +91,7 @@ export async function evaluate(transcript, rubric, anthropic) {
   ];
 
   const callParams = {
-    model:      'claude-sonnet-4-6',
+    model,
     max_tokens: 2048,
     system:     systemConfig,
   };

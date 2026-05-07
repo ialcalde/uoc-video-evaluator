@@ -37,6 +37,7 @@ export async function processVideo({
   rubric,
   outputDir,
   tmpDir,
+  model           = 'claude-sonnet-4-6',
   skipExisting    = false,
   log             = { info: () => {}, ok: () => {} },
   extractAudioFn  = extractAudio,
@@ -69,7 +70,7 @@ export async function processVideo({
 
     // 3. Evaluate
     log.info(`[${student}] Evaluating with Claude…`);
-    const evaluation = await evaluate(transcript, rubric, anthropic);
+    const evaluation = await evaluate(transcript, rubric, anthropic, { model });
     evaluation.evaluatedAt = new Date().toISOString();
 
     // 4. Write output files

@@ -67,7 +67,7 @@ const log = {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 async function main() {
-  const { driveFolderId, skipExisting, concurrency, outputDir, dryRun } =
+  const { driveFolderId, model, skipExisting, concurrency, outputDir, dryRun } =
     parseArgs(process.argv);
 
   const OUT_DIR = outputDir ? outputDir : OUTPUT_DIR;
@@ -133,7 +133,7 @@ async function main() {
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
   const openai    = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-  log.info(`Processing ${entries.length} video(s) — concurrency: ${concurrency}`);
+  log.info(`Processing ${entries.length} video(s) — concurrency: ${concurrency}  model: ${model}`);
   log.sep();
 
   // ── Process videos (bounded concurrency) ───────────────────────────────────
@@ -145,7 +145,7 @@ async function main() {
       try {
         const evaluation = await processVideo({
           videoPath, student, anthropic, openai, rubric,
-          skipExisting, outputDir: OUT_DIR, tmpDir: TMP_DIR, log,
+          model, skipExisting, outputDir: OUT_DIR, tmpDir: TMP_DIR, log,
         });
         return { student, status: 'ok', evaluation };
       } catch (err) {

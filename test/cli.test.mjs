@@ -8,19 +8,26 @@ const argv = (...flags) => ['node', 'index.mjs', ...flags];
 describe('parseArgs', () => {
 
   // Preserve and restore env vars modified by tests
-  let origFolderId;
-  before(() => { origFolderId = process.env.GOOGLE_DRIVE_FOLDER_ID; });
+  let origFolderId, origModel;
+  before(() => {
+    origFolderId = process.env.GOOGLE_DRIVE_FOLDER_ID;
+    origModel    = process.env.ANTHROPIC_MODEL;
+  });
   after(() => {
     if (origFolderId === undefined) delete process.env.GOOGLE_DRIVE_FOLDER_ID;
     else process.env.GOOGLE_DRIVE_FOLDER_ID = origFolderId;
+    if (origModel === undefined) delete process.env.ANTHROPIC_MODEL;
+    else process.env.ANTHROPIC_MODEL = origModel;
   });
 
   // ── Defaults ──────────────────────────────────────────────────────────────
 
   it('returns safe defaults when no flags are given', () => {
     delete process.env.GOOGLE_DRIVE_FOLDER_ID;
+    delete process.env.ANTHROPIC_MODEL;
     const opts = parseArgs(argv());
     assert.equal(opts.driveFolderId, null);
+    assert.equal(opts.model,         'claude-sonnet-4-6');
     assert.equal(opts.skipExisting,  false);
     assert.equal(opts.concurrency,   3);
     assert.equal(opts.outputDir,     null);
@@ -86,6 +93,26 @@ describe('parseArgs', () => {
   it('parses --dry-run', () => {
     const opts = parseArgs(argv('--dry-run'));
     assert.equal(opts.dryRun, true);
+  });
+
+  // ── --model ───────────────────────────────────────────────────────────────
+
+  it('parses --model', () => {
+    delete process.env.ANTHROPIC_MODEL;
+    const opts = parseArgs(argv('--model', 'claude-opus-4-7'));
+    assert.equal(opts.model, 'claude-opus-4-7');
+  });
+
+  it('falls back to ANTHROPIC_MODEL env var when --model is absent', () => {
+    process.env.ANTHROPIC_MODEL = 'claude-haiku-4-5';
+    const opts = parseArgs(argv());
+    assert.equal(opts.model, 'claude-haiku-4-5');
+  });
+
+  it('CLI --model takes precedence over ANTHROPIC_MODEL env var', () => {
+    process.env.ANTHROPIC_MODEL = 'claude-haiku-4-5';
+    const opts = parseArgs(argv('--model', 'claude-opus-4-7'));
+    assert.equal(opts.model, 'claude-opus-4-7');
   });
 
   // ── Combined flags ────────────────────────────────────────────────────────

@@ -83,6 +83,24 @@ describe('evaluate', () => {
     assert.ok(fullText.includes(mockRubric.title),    'rubric title should appear in the prompt');
   });
 
+  it('forwards the model option to the API call', async () => {
+    let capturedModel;
+    const client = {
+      messages: {
+        stream: (params) => ({
+          finalMessage: async () => {
+            capturedModel = params.model;
+            return { content: [{ text: JSON.stringify(validEvaluation) }] };
+          },
+        }),
+        create: async () => ({ content: [{ text: JSON.stringify(validEvaluation) }] }),
+      },
+    };
+
+    await evaluate(mockTranscript, mockRubric, client, { model: 'claude-opus-4-7' });
+    assert.equal(capturedModel, 'claude-opus-4-7');
+  });
+
   it('sets cache_control on rubric block and system prompt, not on transcript block', async () => {
     let capturedParams;
     const client = {
