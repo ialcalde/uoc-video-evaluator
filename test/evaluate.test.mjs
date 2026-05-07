@@ -83,6 +83,31 @@ describe('evaluate', () => {
     assert.ok(fullText.includes(mockRubric.title),    'rubric title should appear in the prompt');
   });
 
+  it('uses feedbackLanguage from rubric in system prompt and instructions', async () => {
+    let capturedSystem, capturedContent;
+    const enRubric = { ...mockRubric, feedbackLanguage: 'en' };
+    const client = {
+      messages: {
+        stream: (params) => ({
+          finalMessage: async () => {
+            capturedSystem  = params.system;
+            capturedContent = params.messages[0].content;
+            return { content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] };
+          },
+        }),
+        create: async () => ({ content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] }),
+      },
+    };
+
+    await evaluate(mockTranscript, enRubric, client);
+
+    const systemText  = capturedSystem[0].text;
+    const rubricText  = capturedContent[0].text;
+    assert.ok(systemText.includes('"en"'),  'system prompt should embed feedbackLanguage code');
+    assert.ok(rubricText.includes('"en"'),  'rubric block should embed feedbackLanguage code');
+    assert.ok(!systemText.includes('CATALÀ'), 'should not contain hardcoded CATALÀ when lang=en');
+  });
+
   it('includes thinking:{type:"adaptive"} in call params when thinking=true', async () => {
     let capturedThinking;
     const client = {
