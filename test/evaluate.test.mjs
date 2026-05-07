@@ -83,6 +83,42 @@ describe('evaluate', () => {
     assert.ok(fullText.includes(mockRubric.title),    'rubric title should appear in the prompt');
   });
 
+  it('includes thinking:{type:"adaptive"} in call params when thinking=true', async () => {
+    let capturedThinking;
+    const client = {
+      messages: {
+        stream: (params) => ({
+          finalMessage: async () => {
+            capturedThinking = params.thinking;
+            return { content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] };
+          },
+        }),
+        create: async () => ({ content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] }),
+      },
+    };
+
+    await evaluate(mockTranscript, mockRubric, client, { thinking: true });
+    assert.deepEqual(capturedThinking, { type: 'adaptive' });
+  });
+
+  it('omits thinking param when thinking=false', async () => {
+    let capturedParams;
+    const client = {
+      messages: {
+        stream: (params) => ({
+          finalMessage: async () => {
+            capturedParams = params;
+            return { content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] };
+          },
+        }),
+        create: async () => ({ content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] }),
+      },
+    };
+
+    await evaluate(mockTranscript, mockRubric, client, { thinking: false });
+    assert.ok(!capturedParams.thinking, 'thinking key should be absent when thinking=false');
+  });
+
   it('handles a thinking block before the text block (extended thinking)', async () => {
     const client = {
       messages: {

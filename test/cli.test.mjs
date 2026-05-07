@@ -115,6 +115,16 @@ describe('parseArgs', () => {
     assert.equal(opts.model, 'claude-opus-4-7');
   });
 
+  // ── --thinking ────────────────────────────────────────────────────────────
+
+  it('parses --thinking', () => {
+    assert.equal(parseArgs(argv('--thinking')).thinking, true);
+  });
+
+  it('defaults thinking to false when flag is absent', () => {
+    assert.equal(parseArgs(argv()).thinking, false);
+  });
+
   // ── --help ────────────────────────────────────────────────────────────────
 
   it('sets help=true for --help', () => {

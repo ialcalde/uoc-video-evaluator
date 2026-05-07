@@ -19,6 +19,7 @@ Options:
   --concurrency <n>     Process up to N students in parallel (default: 3).
   --output-dir <path>   Write results to a custom directory (default: output/).
   --dry-run             List found videos without calling any API.
+  --thinking            Enable adaptive thinking for deeper reasoning (needs claude-opus-4-7).
   --help, -h            Show this help message.
 
 Environment variables:
@@ -44,11 +45,13 @@ Examples:
  *   --concurrency <n>     Max parallel video processing tasks (default 3).
  *   --output-dir <path>   Custom output directory (default: output/).
  *   --dry-run             List what would be processed, without calling any API.
+ *   --thinking            Enable adaptive thinking for the Claude evaluation call.
  *   --help, -h            Print usage and exit.
  *
  * @param {string[]} argv  Typically process.argv.
  * @returns {{ driveFolderId: string|null, model: string, skipExisting: boolean,
- *             concurrency: number, outputDir: string|null, dryRun: boolean, help: boolean }}
+ *             concurrency: number, outputDir: string|null, dryRun: boolean,
+ *             thinking: boolean, help: boolean }}
  */
 export function parseArgs(argv) {
   const args = argv.slice(2);
@@ -67,6 +70,8 @@ export function parseArgs(argv) {
       opts.outputDir = args[++i];
     } else if (args[i] === '--dry-run') {
       opts.dryRun = true;
+    } else if (args[i] === '--thinking') {
+      opts.thinking = true;
     } else if (args[i] === '--help' || args[i] === '-h') {
       opts.help = true;
     }
@@ -79,6 +84,7 @@ export function parseArgs(argv) {
   opts.concurrency   ??= 3;
   opts.outputDir     ??= null;   // null → use the default output/ path in index.mjs
   opts.dryRun        ??= false;
+  opts.thinking      ??= false;
   opts.help          ??= false;
 
   return opts;
