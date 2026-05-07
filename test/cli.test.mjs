@@ -1,6 +1,6 @@
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseArgs } from '../src/cli.mjs';
+import { parseArgs, USAGE } from '../src/cli.mjs';
 
 // Build a fake argv array: ['node', 'index.mjs', ...flags]
 const argv = (...flags) => ['node', 'index.mjs', ...flags];
@@ -113,6 +113,26 @@ describe('parseArgs', () => {
     process.env.ANTHROPIC_MODEL = 'claude-haiku-4-5';
     const opts = parseArgs(argv('--model', 'claude-opus-4-7'));
     assert.equal(opts.model, 'claude-opus-4-7');
+  });
+
+  // ── --help ────────────────────────────────────────────────────────────────
+
+  it('sets help=true for --help', () => {
+    assert.equal(parseArgs(argv('--help')).help, true);
+  });
+
+  it('sets help=true for -h', () => {
+    assert.equal(parseArgs(argv('-h')).help, true);
+  });
+
+  it('defaults help to false when flag is absent', () => {
+    assert.equal(parseArgs(argv()).help, false);
+  });
+
+  it('USAGE string includes all supported flags', () => {
+    for (const flag of ['--drive-folder', '--model', '--skip-existing', '--concurrency', '--output-dir', '--dry-run', '--help']) {
+      assert.ok(USAGE.includes(flag), `USAGE should mention ${flag}`);
+    }
   });
 
   // ── Combined flags ────────────────────────────────────────────────────────

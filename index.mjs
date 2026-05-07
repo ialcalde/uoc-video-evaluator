@@ -41,7 +41,7 @@ import { writeCsv }          from './src/report.mjs';
 import { collectLocalVideos, collectDriveVideos } from './src/source.mjs';
 import { authorise, createDriveClient } from './src/drive.mjs';
 import { runBatch } from './src/batch.mjs';
-import { parseArgs } from './src/cli.mjs';
+import { parseArgs, USAGE } from './src/cli.mjs';
 
 dotenv.config();
 
@@ -67,8 +67,10 @@ const log = {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 async function main() {
-  const { driveFolderId, model, skipExisting, concurrency, outputDir, dryRun } =
+  const { driveFolderId, model, skipExisting, concurrency, outputDir, dryRun, help } =
     parseArgs(process.argv);
+
+  if (help) { console.log(USAGE); process.exit(0); }
 
   const OUT_DIR = outputDir ? outputDir : OUTPUT_DIR;
   if (!existsSync(OUT_DIR)) mkdirSync(OUT_DIR, { recursive: true });
