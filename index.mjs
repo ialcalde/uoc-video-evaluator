@@ -1,19 +1,21 @@
 /**
  * UOC Video Evaluator — Batch Orchestrator
  *
- * Reads every video in input_videos/, runs the full pipeline for each student,
- * and writes per-student output files plus a consolidated results.csv.
+ * Sources (mutually exclusive, Drive takes precedence):
+ *   --drive-folder <id>   or  GOOGLE_DRIVE_FOLDER_ID=<id>  → download from Drive
+ *   (default)                                               → read from input_videos/
  *
  * Per-student output (output/<student>/):
- *   transcript_ca.txt   — Catalan transcript from Whisper
+ *   transcript_ca.txt   — Catalan transcript (Whisper)
  *   evaluation.json     — Claude's structured evaluation
  *   feedback_ca.txt     — Human-readable feedback in Catalan
  *
  * Consolidated output:
- *   output/results.csv  — One row per student
+ *   output/results.csv
  *
  * Usage:
  *   node index.mjs
+ *   node index.mjs --drive-folder 1AbCdEfGhIjKlMnOpQrStUvWxYz
  */
 
 import Anthropic from '@anthropic-ai/sdk';
@@ -21,8 +23,8 @@ import OpenAI    from 'openai';
 import * as dotenv from 'dotenv';
 import { readdirSync, existsSync, mkdirSync } from 'fs';
 import { readFile, writeFile, unlink } from 'fs/promises';
-import { basename, extname, join } from 'path';
-import { fileURLToPath } from 'url';
+import { basename, extname, join }     from 'path';
+import { fileURLToPath }               from 'url';
 
 import { extractAudio }   from './src/audio.mjs';
 import { transcribe }     from './src/transcribe.mjs';
@@ -33,6 +35,7 @@ import {
   writeEvaluation,
   writeFeedback,
 } from './src/report.mjs';
+import { authorise, listVideos, downloadVideo } from './src/drive.mjs';
 
 dotenv.config();
 
@@ -46,7 +49,7 @@ for (const dir of [INPUT_DIR, OUTPUT_DIR, TMP_DIR]) {
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
 }
 
-// ── Accepted video extensions ─────────────────────────────────────────────────
+// ── Local video extensions ────────────────────────────────────────────────────
 const VIDEO_EXTS = new Set(['.mp4', '.mov', '.mkv', '.avi', '.webm']);
 
 // ── Logger ────────────────────────────────────────────────────────────────────
@@ -58,6 +61,83 @@ const log = {
   error: msg => console.error(`[ERROR] ${ts()}  ${msg}`),
   sep:   ()  => console.log( `        ${'─'.repeat(52)}`),
 };
+
+// ── CLI args ──────────────────────────────────────────────────────────────────
+function parseArgs(argv) {
+  const args   = argv.slice(2);
+  const opts   = {};
+
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === '--drive-folder' && args[i + 1]) {
+      opts.driveFolderId = args[++i];
+    }
+  }
+
+  // env var fallback
+  opts.driveFolderId ??= process.env.GOOGLE_DRIVE_FOLDER_ID || null;
+  return opts;
+}
+
+// ── Video source: local ───────────────────────────────────────────────────────
+function collectLocalVideos() {
+  const files = readdirSync(INPUT_DIR)
+    .filter(f => VIDEO_EXTS.has(extname(f).toLowerCase()))
+    .sort();
+
+  return files.map(f => ({
+    videoPath: join(INPUT_DIR, f),
+    student:   basename(f, extname(f)),
+    cleanup:   null,           // nothing to clean up for local files
+  }));
+}
+
+// ── Video source: Google Drive ────────────────────────────────────────────────
+async function collectDriveVideos(folderId) {
+  const auth = await authorise(log);
+
+  log.info(`[Drive] Listing videos in folder: ${folderId}`);
+  const files = await listVideos(folderId, auth);
+
+  if (files.length === 0) {
+    log.warn('[Drive] No video files found in the specified folder.');
+    return [];
+  }
+
+  log.info(`[Drive] Found ${files.length} video(s). Downloading to tmp/…`);
+  log.sep();
+
+  const entries = [];
+
+  for (const file of files) {
+    const student = basename(file.name, extname(file.name));
+    const destPath = join(TMP_DIR, file.name);
+    const sizeMB   = file.size ? (Number(file.size) / 1_048_576).toFixed(1) : '?';
+
+    log.info(`[Drive] Downloading "${file.name}" (${sizeMB} MB)…`);
+
+    let lastLogged = 0;
+    await downloadVideo(file.id, file.name, TMP_DIR, auth, bytes => {
+      const mb = bytes / 1_048_576;
+      if (mb - lastLogged >= 10) {        // log every 10 MB
+        log.info(`[Drive]   … ${mb.toFixed(0)} MB received`);
+        lastLogged = mb;
+      }
+    });
+
+    log.ok(`[Drive] "${file.name}" ready.`);
+
+    entries.push({
+      videoPath: destPath,
+      student,
+      cleanup: async () => {
+        try { await unlink(destPath); } catch { /* already gone */ }
+      },
+    });
+  }
+
+  log.sep();
+  return entries;
+}
 
 // ── CSV helpers ───────────────────────────────────────────────────────────────
 function csvField(value) {
@@ -80,7 +160,9 @@ async function writeCsv(results, rubric) {
       ].join(',');
     }
 
-    const scoreMap = Object.fromEntries(r.evaluation.criteria.map(c => [c.id, c.score]));
+    const scoreMap = Object.fromEntries(
+      r.evaluation.criteria.map(c => [c.id, c.score])
+    );
     return [
       csvField(r.student),
       r.evaluation.weightedScore,
@@ -127,64 +209,67 @@ async function processVideo(videoPath, student, anthropic, openai, rubric) {
     await writeEvaluation(studentDir, evaluation);
     await writeFeedback(studentDir, evaluation);
 
-    log.ok(
-      `[${student}] Done — score: ${evaluation.weightedScore}/10  (${evaluation.grade})`
-    );
-
+    log.ok(`[${student}] Done — score: ${evaluation.weightedScore}/10  (${evaluation.grade})`);
     return evaluation;
+
   } finally {
-    // Always remove the temp audio file
     try { await unlink(audioPath); } catch { /* already gone or never created */ }
   }
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 async function main() {
-  // Validate environment variables
+  const { driveFolderId } = parseArgs(process.argv);
+
+  // ── Required env vars ───────────────────────────────────────────────────────
   const missingKeys = [];
   if (!process.env.ANTHROPIC_API_KEY) missingKeys.push('ANTHROPIC_API_KEY');
   if (!process.env.OPENAI_API_KEY)    missingKeys.push('OPENAI_API_KEY');
+  if (driveFolderId) {
+    if (!process.env.GOOGLE_CLIENT_ID)     missingKeys.push('GOOGLE_CLIENT_ID');
+    if (!process.env.GOOGLE_CLIENT_SECRET) missingKeys.push('GOOGLE_CLIENT_SECRET');
+  }
   if (missingKeys.length) {
     log.error(`Missing environment variables: ${missingKeys.join(', ')}`);
     log.error('Copy .env.example to .env and fill in your keys.');
     process.exit(1);
   }
 
-  // Load rubric
+  // ── Load rubric ─────────────────────────────────────────────────────────────
   const rubric = JSON.parse(
     await readFile(join(__dirname, 'rubric.json'), 'utf8')
   );
 
-  // Init API clients
+  // ── Init API clients ────────────────────────────────────────────────────────
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
   const openai    = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-  // Discover video files
-  let videoFiles;
-  try {
-    videoFiles = readdirSync(INPUT_DIR)
-      .filter(f => VIDEO_EXTS.has(extname(f).toLowerCase()))
-      .sort()
-      .map(f => join(INPUT_DIR, f));
-  } catch {
-    log.error('Cannot read input_videos/ directory.');
-    process.exit(1);
+  // ── Collect videos ──────────────────────────────────────────────────────────
+  let entries;
+
+  if (driveFolderId) {
+    log.info(`Source: Google Drive (folder: ${driveFolderId})`);
+    entries = await collectDriveVideos(driveFolderId);
+  } else {
+    log.info('Source: local input_videos/');
+    entries = collectLocalVideos();
   }
 
-  if (videoFiles.length === 0) {
-    log.warn('No video files found in input_videos/.');
-    log.warn('Add .mp4 / .mov / .mkv / .avi / .webm files and run again.');
+  if (entries.length === 0) {
+    if (!driveFolderId) {
+      log.warn('No video files found in input_videos/.');
+      log.warn('Add .mp4 / .mov / .mkv / .avi / .webm files, or use --drive-folder <id>.');
+    }
     process.exit(0);
   }
 
-  log.info(`Found ${videoFiles.length} video(s) in input_videos/.`);
+  log.info(`Processing ${entries.length} video(s)…`);
   log.sep();
 
-  // Process each video — errors are caught per file so the batch continues
+  // ── Process each video ──────────────────────────────────────────────────────
   const results = [];
 
-  for (const videoPath of videoFiles) {
-    const student = basename(videoPath, extname(videoPath));
+  for (const { videoPath, student, cleanup } of entries) {
     try {
       const evaluation = await processVideo(
         videoPath, student, anthropic, openai, rubric
@@ -193,14 +278,16 @@ async function main() {
     } catch (err) {
       log.error(`[${student}] Failed: ${err.message}`);
       results.push({ student, status: 'error', error: err.message });
+    } finally {
+      await cleanup?.();     // remove Drive-downloaded file after processing
     }
     log.sep();
   }
 
-  // Write consolidated CSV
+  // ── Write CSV ───────────────────────────────────────────────────────────────
   const csvPath = await writeCsv(results, rubric);
 
-  // Final summary
+  // ── Summary ─────────────────────────────────────────────────────────────────
   const nOk    = results.filter(r => r.status === 'ok').length;
   const nError = results.filter(r => r.status === 'error').length;
 
