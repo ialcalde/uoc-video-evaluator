@@ -21,6 +21,7 @@ Options:
   --dry-run             List found videos without calling any API.
   --rebuild-csv         Regenerate results.csv from existing evaluation.json files (no API calls).
   --thinking            Enable adaptive thinking for deeper reasoning (needs claude-opus-4-7).
+  --version             Print the package version and exit.
   --help, -h            Show this help message.
 
 Environment variables:
@@ -74,6 +75,8 @@ export function parseArgs(argv) {
       opts.dryRun = true;
     } else if (args[i] === '--rebuild-csv') {
       opts.rebuildCsv = true;
+    } else if (args[i] === '--version') {
+      opts.version = true;
     } else if (args[i] === '--thinking') {
       opts.thinking = true;
     } else if (args[i] === '--help' || args[i] === '-h') {
@@ -89,6 +92,7 @@ export function parseArgs(argv) {
   opts.outputDir     ??= null;   // null → use the default output/ path in index.mjs
   opts.dryRun        ??= false;
   opts.rebuildCsv    ??= false;
+  opts.version       ??= false;
   opts.thinking      ??= false;
   opts.help          ??= false;
 

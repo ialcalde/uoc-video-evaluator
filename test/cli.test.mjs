@@ -115,6 +115,16 @@ describe('parseArgs', () => {
     assert.equal(opts.model, 'claude-opus-4-7');
   });
 
+  // ── --version ─────────────────────────────────────────────────────────────
+
+  it('parses --version', () => {
+    assert.equal(parseArgs(argv('--version')).version, true);
+  });
+
+  it('defaults version to false when flag is absent', () => {
+    assert.equal(parseArgs(argv()).version, false);
+  });
+
   // ── --rebuild-csv ─────────────────────────────────────────────────────────
 
   it('parses --rebuild-csv', () => {

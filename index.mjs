@@ -67,9 +67,14 @@ const log = {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 async function main() {
-  const { driveFolderId, model, thinking, skipExisting, concurrency, outputDir, dryRun, rebuildCsv: doRebuild, help } =
-    parseArgs(process.argv);
+  const { driveFolderId, model, thinking, skipExisting, concurrency, outputDir,
+          dryRun, rebuildCsv: doRebuild, version, help } = parseArgs(process.argv);
 
+  if (version) {
+    const pkg = JSON.parse(await readFile(join(__dirname, 'package.json'), 'utf8'));
+    console.log(`${pkg.name} ${pkg.version}`);
+    process.exit(0);
+  }
   if (help) { console.log(USAGE); process.exit(0); }
 
   const OUT_DIR = outputDir ? outputDir : OUTPUT_DIR;
