@@ -31,21 +31,13 @@ import Anthropic from '@anthropic-ai/sdk';
 import OpenAI    from 'openai';
 import * as dotenv from 'dotenv';
 import { readdirSync, existsSync, mkdirSync } from 'fs';
-import { readFile, writeFile, unlink } from 'fs/promises';
+import { readFile, unlink }            from 'fs/promises';
 import { basename, extname, join }     from 'path';
 import { fileURLToPath }               from 'url';
 
-import { extractAudio }   from './src/audio.mjs';
-import { transcribe }     from './src/transcribe.mjs';
-import { evaluate }       from './src/evaluate.mjs';
 import { validateRubric } from './src/validate.mjs';
-import {
-  ensureStudentDir,
-  writeTranscript,
-  writeEvaluation,
-  writeFeedback,
-  writeCsv,
-} from './src/report.mjs';
+import { processVideo }   from './src/pipeline.mjs';
+import { writeCsv }       from './src/report.mjs';
 import { authorise, createDriveClient, listVideos, downloadVideo } from './src/drive.mjs';
 import { runBatch } from './src/batch.mjs';
 import { parseArgs } from './src/cli.mjs';
@@ -137,50 +129,6 @@ async function collectDriveVideos(folderId) {
   return entries;
 }
 
-// ── Single-video pipeline ─────────────────────────────────────────────────────
-async function processVideo(videoPath, student, anthropic, openai, rubric, skipExisting = false, outDir = OUTPUT_DIR) {
-  const audioPath  = join(TMP_DIR, `${student}_${Date.now()}.mp3`);
-  const studentDir = ensureStudentDir(outDir, student);
-  const evalPath   = join(studentDir, 'evaluation.json');
-
-  if (skipExisting && existsSync(evalPath)) {
-    log.info(`[${student}] Already evaluated — skipping.`);
-    return JSON.parse(await readFile(evalPath, 'utf8'));
-  }
-
-  try {
-    // 1. Extract audio
-    log.info(`[${student}] Extracting audio…`);
-    await extractAudio(videoPath, audioPath);
-
-    // 2. Transcribe
-    log.info(`[${student}] Transcribing (Whisper, lang=ca)…`);
-    const transcript = await transcribe(audioPath, openai);
-
-    if (!transcript.text?.trim()) {
-      throw new Error('Transcription is empty — does the video have audio?');
-    }
-
-    await writeTranscript(studentDir, transcript.text);
-    log.info(`[${student}] transcript_ca.txt saved (${transcript.text.length} chars).`);
-
-    // 3. Evaluate
-    log.info(`[${student}] Evaluating with Claude…`);
-    const evaluation = await evaluate(transcript, rubric, anthropic);
-    evaluation.evaluatedAt = new Date().toISOString();
-
-    // 4. Write output files
-    await writeEvaluation(studentDir, evaluation);
-    await writeFeedback(studentDir, evaluation);
-
-    log.ok(`[${student}] Done — score: ${evaluation.weightedScore}/10  (${evaluation.grade})`);
-    return evaluation;
-
-  } finally {
-    try { await unlink(audioPath); } catch { /* already gone or never created */ }
-  }
-}
-
 // ── Main ──────────────────────────────────────────────────────────────────────
 async function main() {
   const { driveFolderId, skipExisting, concurrency, outputDir, dryRun } =
@@ -257,9 +205,10 @@ async function main() {
     async ({ videoPath, student, cleanup }, idx) => {
       log.info(`[${idx + 1}/${total}] Starting ${student}`);
       try {
-        const evaluation = await processVideo(
-          videoPath, student, anthropic, openai, rubric, skipExisting, OUT_DIR
-        );
+        const evaluation = await processVideo({
+          videoPath, student, anthropic, openai, rubric,
+          skipExisting, outputDir: OUT_DIR, tmpDir: TMP_DIR, log,
+        });
         return { student, status: 'ok', evaluation };
       } catch (err) {
         log.error(`[${student}] Failed: ${err.message}`);
