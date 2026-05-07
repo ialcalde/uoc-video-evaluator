@@ -129,5 +129,18 @@ export function validateRubric(rubric) {
     throw new Error('Rubric "gradingScale" must be a non-empty array');
   }
 
+  for (const [i, entry] of rubric.gradingScale.entries()) {
+    const ctx = `gradingScale[${i}]`;
+    if (typeof entry.min !== 'number' || typeof entry.max !== 'number') {
+      throw new Error(`${ctx}: "min" and "max" must be numbers`);
+    }
+    if (entry.max < entry.min) {
+      throw new Error(`${ctx}: "max" (${entry.max}) must be >= "min" (${entry.min})`);
+    }
+    if (typeof entry.label !== 'string' || !entry.label.trim()) {
+      throw new Error(`${ctx}: "label" must be a non-empty string`);
+    }
+  }
+
   return rubric;
 }

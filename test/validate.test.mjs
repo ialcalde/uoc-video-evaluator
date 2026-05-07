@@ -234,4 +234,19 @@ describe('validateRubric', () => {
     assert.throws(() => validateRubric({ ...mockRubric, gradingScale: null }), /gradingScale/i);
   });
 
+  it('throws when a gradingScale entry is missing min or max', () => {
+    const bad = { ...mockRubric, gradingScale: [{ label: 'A' }] };
+    assert.throws(() => validateRubric(bad), /min.*max.*numbers/i);
+  });
+
+  it('throws when a gradingScale entry has max < min', () => {
+    const bad = { ...mockRubric, gradingScale: [{ min: 7, max: 5, label: 'X' }] };
+    assert.throws(() => validateRubric(bad), /must be >=/i);
+  });
+
+  it('throws when a gradingScale entry has a missing label', () => {
+    const bad = { ...mockRubric, gradingScale: [{ min: 0, max: 10, label: '' }] };
+    assert.throws(() => validateRubric(bad), /label/i);
+  });
+
 });
