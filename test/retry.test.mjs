@@ -89,6 +89,27 @@ describe('withRetry', () => {
     assert.equal(calls, 4, '1 initial + 3 retries = 4 total');
   });
 
+  it('calls onRetry callback with attempt, maxRetries, status, and delayMs', async () => {
+    const events = [];
+    let calls = 0;
+    await withRetry(
+      () => { calls++; if (calls < 3) throw apiError(429); return Promise.resolve('ok'); },
+      { baseDelay: 0, onRetry: ev => events.push(ev) }
+    );
+    assert.equal(events.length, 2, 'two retries → two onRetry events');
+    assert.equal(events[0].attempt,    1);
+    assert.equal(events[0].maxRetries, 4);
+    assert.equal(events[0].status,     429);
+    assert.equal(typeof events[0].delayMs, 'number');
+    assert.equal(events[1].attempt, 2);
+  });
+
+  it('does not require onRetry (omitting it is safe)', async () => {
+    await assert.doesNotReject(
+      () => withRetry(() => Promise.resolve('ok'))
+    );
+  });
+
   it('uses statusCode as fallback when status is absent', async () => {
     let calls = 0;
     const result = await withRetry(() => {

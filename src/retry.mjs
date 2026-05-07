@@ -4,17 +4,20 @@ const RETRYABLE = new Set([429, 500, 502, 503, 504]);
  * Call fn(), retrying with exponential back-off on retryable HTTP errors.
  *
  * @param {() => Promise<T>} fn
- * @param {{ maxRetries?: number, baseDelay?: number }} opts
+ * @param {{ maxRetries?: number, baseDelay?: number,
+ *           onRetry?: ({attempt, maxRetries, status, delayMs}) => void }} opts
  * @returns {Promise<T>}
  */
-export async function withRetry(fn, { maxRetries = 4, baseDelay = 1_000 } = {}) {
+export async function withRetry(fn, { maxRetries = 4, baseDelay = 1_000, onRetry } = {}) {
   for (let attempt = 0; ; attempt++) {
     try {
       return await fn();
     } catch (err) {
       const status = err.status ?? err.statusCode;
       if (attempt >= maxRetries || !RETRYABLE.has(status)) throw err;
-      await new Promise(r => setTimeout(r, baseDelay * 2 ** attempt + Math.random() * 200));
+      const delayMs = Math.round(baseDelay * 2 ** attempt + Math.random() * 200);
+      onRetry?.({ attempt: attempt + 1, maxRetries, status, delayMs });
+      await new Promise(r => setTimeout(r, delayMs));
     }
   }
 }

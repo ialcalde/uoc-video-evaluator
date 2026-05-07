@@ -99,12 +99,16 @@ export async function evaluate(transcript, rubric, anthropic, { model = 'claude-
     ...(thinking ? { thinking: { type: 'adaptive' } } : {}),
   };
 
+  const retryLog = ({ attempt, maxRetries, status }) =>
+    console.warn(`[WARN]  evaluate: HTTP ${status} — retry ${attempt}/${maxRetries}`);
+
   // ── First attempt — streamed to avoid timeout on long transcripts ───────
-  const first = await withRetry(() =>
-    anthropic.messages.stream({
+  const first = await withRetry(
+    () => anthropic.messages.stream({
       ...callParams,
       messages: [{ role: 'user', content: userContent }],
-    }).finalMessage()
+    }).finalMessage(),
+    { onRetry: retryLog }
   );
 
   const firstText = first.content.find(b => b.type === 'text');
@@ -115,20 +119,23 @@ export async function evaluate(transcript, rubric, anthropic, { model = 'claude-
     return validateEvaluation(rawFirst, rubric);
   } catch (firstError) {
     // ── Schema-correction retry — reuse systemConfig/userContent for cache hit
-    const retry = await withRetry(() => anthropic.messages.create({
-      ...callParams,
-      messages: [
-        { role: 'user',      content: userContent },
-        { role: 'assistant', content: rawFirst    },
-        {
-          role: 'user',
-          content:
-            `El JSON retornat no és vàlid: ${firstError.message}\n` +
-            `Si us plau, retorna el JSON corregit seguint exactament l'esquema indicat. ` +
-            `Sense text addicional, sense blocs markdown.`,
-        },
-      ],
-    }));
+    const retry = await withRetry(
+      () => anthropic.messages.create({
+        ...callParams,
+        messages: [
+          { role: 'user',      content: userContent },
+          { role: 'assistant', content: rawFirst    },
+          {
+            role: 'user',
+            content:
+              `El JSON retornat no és vàlid: ${firstError.message}\n` +
+              `Si us plau, retorna el JSON corregit seguint exactament l'esquema indicat. ` +
+              `Sense text addicional, sense blocs markdown.`,
+          },
+        ],
+      }),
+      { onRetry: retryLog }
+    );
 
     const retryText = retry.content.find(b => b.type === 'text');
     if (!retryText) throw new Error('Claude returned no text content in schema-correction retry');
