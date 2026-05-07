@@ -37,7 +37,7 @@ import { fileURLToPath }               from 'url';
 
 import { validateRubric }    from './src/validate.mjs';
 import { processVideo }      from './src/pipeline.mjs';
-import { writeCsv }          from './src/report.mjs';
+import { writeCsv, rebuildCsv } from './src/report.mjs';
 import { collectLocalVideos, collectDriveVideos } from './src/source.mjs';
 import { authorise, createDriveClient } from './src/drive.mjs';
 import { runBatch } from './src/batch.mjs';
@@ -67,7 +67,7 @@ const log = {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 async function main() {
-  const { driveFolderId, model, thinking, skipExisting, concurrency, outputDir, dryRun, help } =
+  const { driveFolderId, model, thinking, skipExisting, concurrency, outputDir, dryRun, rebuildCsv: doRebuild, help } =
     parseArgs(process.argv);
 
   if (help) { console.log(USAGE); process.exit(0); }
@@ -84,6 +84,14 @@ async function main() {
   } catch (err) {
     log.error(`Invalid rubric.json: ${err.message}`);
     process.exit(1);
+  }
+
+  // ── Rebuild CSV from existing evaluation.json files ────────────────────────
+  if (doRebuild) {
+    log.info(`[REBUILD] Scanning ${OUT_DIR} for evaluation.json files…`);
+    const csvPath = await rebuildCsv(OUT_DIR, rubric);
+    log.ok(`[REBUILD] CSV written → ${csvPath}`);
+    process.exit(0);
   }
 
   // ── Collect videos ──────────────────────────────────────────────────────────

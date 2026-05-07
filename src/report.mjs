@@ -1,5 +1,5 @@
-import { existsSync, mkdirSync } from 'fs';
-import { writeFile } from 'fs/promises';
+import { existsSync, mkdirSync, readdirSync } from 'fs';
+import { readFile, writeFile } from 'fs/promises';
 import { join } from 'path';
 
 // ── CSV helpers ───────────────────────────────────────────────────────────────
@@ -79,6 +79,32 @@ export async function writeEvaluation(studentDir, evaluation) {
 /**
  * Write feedback_ca.txt — human-readable summary in Catalan.
  */
+/**
+ * Scan outputDir for student sub-directories with evaluation.json and rebuild results.csv.
+ * Useful after a partial batch run or when adding new evaluations.
+ *
+ * @param {string} outputDir  Directory containing per-student sub-folders.
+ * @param {object} rubric     Parsed rubric (needed for CSV column names).
+ * @returns {Promise<string>} Path of the written CSV.
+ */
+export async function rebuildCsv(outputDir, rubric) {
+  const entries = readdirSync(outputDir, { withFileTypes: true });
+  const results = [];
+
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const evalPath = join(outputDir, entry.name, 'evaluation.json');
+    if (!existsSync(evalPath)) continue;
+    try {
+      const evaluation = JSON.parse(await readFile(evalPath, 'utf8'));
+      results.push({ student: entry.name, status: 'ok', evaluation });
+    } catch { /* skip unreadable files */ }
+  }
+
+  results.sort((a, b) => a.student.localeCompare(b.student));
+  return writeCsv(outputDir, results, rubric);
+}
+
 export async function writeFeedback(studentDir, evaluation) {
   const lines = [
     `Data d'avaluació : ${evaluation.evaluatedAt}`,

@@ -10,6 +10,7 @@ import {
   writeEvaluation,
   writeFeedback,
   writeCsv,
+  rebuildCsv,
   csvField,
 } from '../src/report.mjs';
 import { mockRubric, validEvaluation } from './fixtures.mjs';
@@ -167,5 +168,75 @@ describe('report', () => {
   it('writeCsv: returns the path of the written file', async () => {
     const csvPath = await writeCsv(tmpBase, [], mockRubric);
     assert.ok(csvPath.endsWith('results.csv'));
+  });
+
+  // ── rebuildCsv ──────────────────────────────────────────────────────────────
+
+  it('rebuildCsv: picks up evaluation.json files from student sub-dirs', async () => {
+    const rebuildBase = mkdtempSync(join(tmpdir(), 'uoc-rebuild-test-'));
+    try {
+      const dir = ensureStudentDir(rebuildBase, 'anna');
+      await writeEvaluation(dir, validEvaluation);
+
+      const csvPath = await rebuildCsv(rebuildBase, mockRubric);
+      const raw = await readFile(csvPath, 'utf8');
+
+      assert.ok(raw.includes('anna'));
+      assert.ok(raw.includes(String(validEvaluation.weightedScore)));
+    } finally {
+      rmSync(rebuildBase, { recursive: true, force: true });
+    }
+  });
+
+  it('rebuildCsv: ignores sub-dirs without evaluation.json', async () => {
+    const rebuildBase = mkdtempSync(join(tmpdir(), 'uoc-rebuild-test-'));
+    try {
+      // One directory WITH eval, one WITHOUT
+      const dirA = ensureStudentDir(rebuildBase, 'alice');
+      await writeEvaluation(dirA, validEvaluation);
+      ensureStudentDir(rebuildBase, 'bob');  // no evaluation.json
+
+      const csvPath = await rebuildCsv(rebuildBase, mockRubric);
+      const raw = await readFile(csvPath, 'utf8');
+      const lines = raw.trim().split('\n');
+
+      assert.equal(lines.length, 2, 'header + 1 data row');
+      assert.ok(raw.includes('alice'));
+      assert.ok(!raw.includes('bob'));
+    } finally {
+      rmSync(rebuildBase, { recursive: true, force: true });
+    }
+  });
+
+  it('rebuildCsv: returns results sorted alphabetically', async () => {
+    const rebuildBase = mkdtempSync(join(tmpdir(), 'uoc-rebuild-test-'));
+    try {
+      for (const name of ['charlie', 'alice', 'bob']) {
+        const d = ensureStudentDir(rebuildBase, name);
+        await writeEvaluation(d, validEvaluation);
+      }
+
+      const csvPath = await rebuildCsv(rebuildBase, mockRubric);
+      const raw = await readFile(csvPath, 'utf8');
+      const dataLines = raw.trim().split('\n').slice(1);  // skip header
+
+      assert.ok(dataLines[0].startsWith('alice'));
+      assert.ok(dataLines[1].startsWith('bob'));
+      assert.ok(dataLines[2].startsWith('charlie'));
+    } finally {
+      rmSync(rebuildBase, { recursive: true, force: true });
+    }
+  });
+
+  it('rebuildCsv: returns empty CSV when no evaluation.json files exist', async () => {
+    const rebuildBase = mkdtempSync(join(tmpdir(), 'uoc-rebuild-test-'));
+    try {
+      const csvPath = await rebuildCsv(rebuildBase, mockRubric);
+      const raw = await readFile(csvPath, 'utf8');
+      const lines = raw.trim().split('\n');
+      assert.equal(lines.length, 1, 'only header row');
+    } finally {
+      rmSync(rebuildBase, { recursive: true, force: true });
+    }
   });
 });

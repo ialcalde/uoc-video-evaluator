@@ -115,6 +115,16 @@ describe('parseArgs', () => {
     assert.equal(opts.model, 'claude-opus-4-7');
   });
 
+  // ── --rebuild-csv ─────────────────────────────────────────────────────────
+
+  it('parses --rebuild-csv', () => {
+    assert.equal(parseArgs(argv('--rebuild-csv')).rebuildCsv, true);
+  });
+
+  it('defaults rebuildCsv to false when flag is absent', () => {
+    assert.equal(parseArgs(argv()).rebuildCsv, false);
+  });
+
   // ── --thinking ────────────────────────────────────────────────────────────
 
   it('parses --thinking', () => {
