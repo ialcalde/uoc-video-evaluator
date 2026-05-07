@@ -6,7 +6,8 @@
   "main": "index.mjs",
   "scripts": {
     "start": "node index.mjs",
-    "evaluate": "node index.mjs"
+    "evaluate": "node index.mjs",
+    "test": "node --test test/validate.test.mjs test/evaluate.test.mjs test/report.test.mjs test/transcribe.test.mjs test/audio.test.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.37.0",
