@@ -3,15 +3,15 @@ import assert from 'node:assert/strict';
 import { evaluate } from '../src/evaluate.mjs';
 import { mockRubric, validEvaluation } from './fixtures.mjs';
 
-// Build a minimal mock Anthropic client whose create() returns a given text.
+// Build a minimal mock Anthropic client.
+// First call goes through stream().finalMessage(); retries go through create().
 function makeClient(...responses) {
   let call = 0;
+  const next = () => ({ content: [{ text: responses[Math.min(call++, responses.length - 1)] }] });
   return {
     messages: {
-      create: async () => {
-        const text = responses[Math.min(call++, responses.length - 1)];
-        return { content: [{ text }] };
-      },
+      stream:  ()    => ({ finalMessage: async () => next() }),
+      create:  async () => next(),
     },
   };
 }
@@ -64,10 +64,13 @@ describe('evaluate', () => {
     let capturedMessages;
     const client = {
       messages: {
-        create: async ({ messages }) => {
-          capturedMessages = messages;
-          return { content: [{ text: JSON.stringify(validEvaluation) }] };
-        },
+        stream: ({ messages }) => ({
+          finalMessage: async () => {
+            capturedMessages = messages;
+            return { content: [{ text: JSON.stringify(validEvaluation) }] };
+          },
+        }),
+        create: async () => ({ content: [{ text: JSON.stringify(validEvaluation) }] }),
       },
     };
 
@@ -84,10 +87,13 @@ describe('evaluate', () => {
     let capturedParams;
     const client = {
       messages: {
-        create: async (params) => {
-          capturedParams = params;
-          return { content: [{ text: JSON.stringify(validEvaluation) }] };
-        },
+        stream: (params) => ({
+          finalMessage: async () => {
+            capturedParams = params;
+            return { content: [{ text: JSON.stringify(validEvaluation) }] };
+          },
+        }),
+        create: async () => ({ content: [{ text: JSON.stringify(validEvaluation) }] }),
       },
     };
 

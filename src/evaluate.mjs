@@ -96,11 +96,13 @@ export async function evaluate(transcript, rubric, anthropic) {
     system:     systemConfig,
   };
 
-  // ── First attempt (with HTTP-error retry) ────────────────────────────────
-  const first = await withRetry(() => anthropic.messages.create({
-    ...callParams,
-    messages: [{ role: 'user', content: userContent }],
-  }));
+  // ── First attempt — streamed to avoid timeout on long transcripts ───────
+  const first = await withRetry(() =>
+    anthropic.messages.stream({
+      ...callParams,
+      messages: [{ role: 'user', content: userContent }],
+    }).finalMessage()
+  );
 
   const rawFirst = first.content[0].text.trim();
 
