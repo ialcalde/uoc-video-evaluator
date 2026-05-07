@@ -44,7 +44,8 @@ export async function processVideo({
   extractAudioFn  = extractAudio,
   transcribeFn    = transcribe,
 }) {
-  const audioPath  = join(tmpDir, `${student}_${Date.now()}.mp3`);
+  const start      = Date.now();
+  const audioPath  = join(tmpDir, `${student}_${start}.mp3`);
   const studentDir = ensureStudentDir(outputDir, student);
   const evalPath   = join(studentDir, 'evaluation.json');
 
@@ -79,7 +80,8 @@ export async function processVideo({
     await writeEvaluation(studentDir, evaluation);
     await writeFeedback(studentDir, evaluation);
 
-    log.ok(`[${student}] Done — score: ${evaluation.weightedScore}/10  (${evaluation.grade})`);
+    const elapsedS = ((Date.now() - start) / 1000).toFixed(1);
+    log.ok(`[${student}] Done — score: ${evaluation.weightedScore}/10  (${evaluation.grade}) — ${elapsedS}s`);
     return evaluation;
 
   } finally {
