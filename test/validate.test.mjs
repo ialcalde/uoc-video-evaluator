@@ -229,6 +229,23 @@ describe('validateRubric', () => {
     assert.throws(() => validateRubric(bad), /levels/i);
   });
 
+  it('throws when a level entry has an invalid score', () => {
+    const badLevels = [{ score: 11, label: 'X', description: 'Y' }];
+    const bad = { ...mockRubric, criteria: [{ ...mockRubric.criteria[0], levels: badLevels }, mockRubric.criteria[1]] };
+    assert.throws(() => validateRubric(bad), /levels\[0\].*score/i);
+  });
+
+  it('throws when a level entry is missing a label', () => {
+    const badLevels = [{ score: 5, label: '', description: 'Y' }];
+    const bad = { ...mockRubric, criteria: [{ ...mockRubric.criteria[0], levels: badLevels }, mockRubric.criteria[1]] };
+    assert.throws(() => validateRubric(bad), /label/i);
+  });
+
+  it('throws when duplicate criterion ids exist', () => {
+    const bad = { ...mockRubric, criteria: [mockRubric.criteria[0], mockRubric.criteria[0]] };
+    assert.throws(() => validateRubric(bad), /duplicate criterion id/i);
+  });
+
   it('throws when gradingScale is missing or empty', () => {
     assert.throws(() => validateRubric({ ...mockRubric, gradingScale: [] }),  /gradingScale/i);
     assert.throws(() => validateRubric({ ...mockRubric, gradingScale: null }), /gradingScale/i);

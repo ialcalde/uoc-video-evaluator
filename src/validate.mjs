@@ -115,8 +115,26 @@ export function validateRubric(rubric) {
     if (!Array.isArray(c.levels) || c.levels.length === 0) {
       throw new Error(`${ctx} ("${c.id}"): "levels" must be a non-empty array`);
     }
+    for (const [li, level] of c.levels.entries()) {
+      if (typeof level.score !== 'number' || level.score < 0 || level.score > 10) {
+        throw new Error(`${ctx} ("${c.id}") levels[${li}]: "score" must be a number 0–10`);
+      }
+      if (typeof level.label !== 'string' || !level.label.trim()) {
+        throw new Error(`${ctx} ("${c.id}") levels[${li}]: "label" must be a non-empty string`);
+      }
+      if (typeof level.description !== 'string') {
+        throw new Error(`${ctx} ("${c.id}") levels[${li}]: "description" must be a string`);
+      }
+    }
 
     totalWeight += c.weight;
+  }
+
+  // Duplicate criterion IDs
+  const idSet = new Set();
+  for (const c of rubric.criteria) {
+    if (idSet.has(c.id)) throw new Error(`Duplicate criterion id: "${c.id}"`);
+    idSet.add(c.id);
   }
 
   if (Math.abs(totalWeight - 1) > 0.01) {
