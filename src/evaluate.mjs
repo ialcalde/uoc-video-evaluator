@@ -201,6 +201,14 @@ export async function evaluate(transcript, rubric, anthropic, { model = 'claude-
       });
     }
 
-    return validateEvaluation(rawRetry, rubric);
+    try {
+      return validateEvaluation(rawRetry, rubric);
+    } catch (retryError) {
+      throw new Error(
+        `Evaluation failed after schema-correction retry.\n` +
+        `  First attempt:  ${firstError.message}\n` +
+        `  Retry attempt:  ${retryError.message}`
+      );
+    }
   }
 }

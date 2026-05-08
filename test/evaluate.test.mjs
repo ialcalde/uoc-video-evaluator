@@ -55,7 +55,13 @@ describe('evaluate', () => {
 
     await assert.rejects(
       () => evaluate(mockTranscript, mockRubric, client),
-      /overallFeedback/i
+      err => {
+        // Error should mention BOTH attempts so the caller can diagnose the root cause
+        assert.match(err.message, /schema-correction retry/i, 'should mention retry context');
+        assert.match(err.message, /overallFeedback/i, 'should include first attempt error');
+        assert.match(err.message, /Retry attempt/i,   'should include retry attempt label');
+        return true;
+      }
     );
   });
 

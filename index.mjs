@@ -93,7 +93,13 @@ async function main() {
     log.error(rubricFile ? 'Check the --rubric path.' : 'Create rubric.json in the project root or use --rubric <path>.');
     process.exit(1);
   }
-  const rubric = JSON.parse(await readFile(rubricPath, 'utf8'));
+  let rubric;
+  try {
+    rubric = JSON.parse(await readFile(rubricPath, 'utf8'));
+  } catch (err) {
+    log.error(`Failed to parse rubric JSON (${rubricPath}): ${err.message}`);
+    process.exit(1);
+  }
   try {
     validateRubric(rubric);
   } catch (err) {
