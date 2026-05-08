@@ -44,12 +44,15 @@ export async function processVideo({
   extractAudioFn  = extractAudio,
   transcribeFn    = transcribe,
 }) {
-  const start      = Date.now();
-  const audioPath  = join(tmpDir, `${student}_${start}.mp3`);
-  const studentDir = ensureStudentDir(outputDir, student);
-  const evalPath   = join(studentDir, 'evaluation.json');
+  const start          = Date.now();
+  const audioPath      = join(tmpDir, `${student}_${start}.mp3`);
+  const studentDir     = ensureStudentDir(outputDir, student);
+  const evalPath       = join(studentDir, 'evaluation.json');
+  const transcriptLang = rubric.language         || 'ca';
+  const feedbackLang   = rubric.feedbackLanguage || 'ca';
 
-  if (skipExisting && existsSync(evalPath)) {
+  if (skipExisting && existsSync(evalPath) &&
+      existsSync(join(studentDir, `feedback_${feedbackLang}.txt`))) {
     log.info(`[${student}] Already evaluated — skipping.`);
     return { evaluation: JSON.parse(await readFile(evalPath, 'utf8')), tokenUsage: null };
   }
@@ -60,8 +63,6 @@ export async function processVideo({
     await extractAudioFn(videoPath, audioPath);
 
     // 2. Transcribe
-    const transcriptLang = rubric.language      || 'ca';
-    const feedbackLang   = rubric.feedbackLanguage || 'ca';
     log.info(`[${student}] Transcribing (Whisper, lang=${transcriptLang})…`);
     const transcript = await transcribeFn(audioPath, openai, {
       language: transcriptLang,

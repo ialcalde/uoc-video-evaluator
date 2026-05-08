@@ -1,6 +1,6 @@
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, existsSync } from 'fs';
+import { mkdtempSync, rmSync, existsSync, writeFileSync } from 'fs';
 import { readFile } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
@@ -246,6 +246,29 @@ describe('report', () => {
     assert.ok(raw.includes('"Puig, Joan"'));
   });
 
+  it('writeCsv: ok rows handle undefined evaluatedAt and overallFeedback without writing "undefined"', async () => {
+    const evalWithMissing = { ...validEvaluation, evaluatedAt: undefined, overallFeedback: undefined };
+    const csvPath = await writeCsv(tmpBase, [{ student: 'sparse_ok_student', status: 'ok', evaluation: evalWithMissing }], mockRubric);
+    const raw = await readFile(csvPath, 'utf8');
+    assert.ok(!raw.includes('undefined'), 'should not write the string "undefined" to CSV');
+    assert.ok(raw.includes('sparse_ok_student'));
+  });
+
+  it('writeCsv: emits empty cell when criterion id is absent from evaluation scoreMap', async () => {
+    // Rubric references 'absent_crit' but the evaluation only has content_accuracy and oral_expression
+    const extendedRubric = {
+      ...mockRubric,
+      criteria: [mockRubric.criteria[0], { ...mockRubric.criteria[1], id: 'absent_crit' }],
+    };
+    const csvPath = await writeCsv(tmpBase, [{ student: 'absent_crit_student', status: 'ok', evaluation: validEvaluation }], extendedRubric);
+    const raw = await readFile(csvPath, 'utf8');
+    const headerFields = raw.split('\n')[0].split(',');
+    const absentIdx = headerFields.indexOf('absent_crit');
+    assert.ok(absentIdx >= 0, 'header should include absent_crit column');
+    const dataFields = raw.split('\n')[1].split(',');
+    assert.equal(dataFields[absentIdx], '', 'absent criterion column should be empty string, not "undefined"');
+  });
+
   it('writeCsv: returns the path of the written file', async () => {
     const csvPath = await writeCsv(tmpBase, [], mockRubric);
     assert.ok(csvPath.endsWith('results.csv'));
@@ -306,6 +329,28 @@ describe('report', () => {
       assert.ok(dataLines[0].startsWith('alice'));
       assert.ok(dataLines[1].startsWith('bob'));
       assert.ok(dataLines[2].startsWith('charlie'));
+    } finally {
+      rmSync(rebuildBase, { recursive: true, force: true });
+    }
+  });
+
+  it('rebuildCsv: silently skips student directories with malformed evaluation.json', async () => {
+    const rebuildBase = mkdtempSync(join(tmpdir(), 'uoc-rebuild-test-'));
+    try {
+      // Malformed JSON file — rebuildCsv should skip it without throwing
+      const badDir = ensureStudentDir(rebuildBase, 'malformed_student');
+      writeFileSync(join(badDir, 'evaluation.json'), '{ not valid json }', 'utf8');
+
+      // One valid evaluation alongside the bad one
+      const goodDir = ensureStudentDir(rebuildBase, 'good_student');
+      await writeEvaluation(goodDir, validEvaluation);
+
+      const { csvPath, count } = await rebuildCsv(rebuildBase, mockRubric);
+      const raw = await readFile(csvPath, 'utf8');
+
+      assert.equal(count, 1, 'should count only valid evaluations');
+      assert.ok(raw.includes('good_student'), 'valid student should appear in CSV');
+      assert.ok(!raw.includes('malformed_student'), 'malformed student should be skipped');
     } finally {
       rmSync(rebuildBase, { recursive: true, force: true });
     }
