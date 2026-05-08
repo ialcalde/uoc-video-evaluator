@@ -142,6 +142,15 @@ describe('report', () => {
     assert.ok(colonPositions[0] >= 19, 'column separator should be after the longest label');
   });
 
+  it('writeFeedback handles undefined rubricTitle without writing "undefined"', async () => {
+    const dir = ensureStudentDir(tmpBase, 'no_title_student');
+    const evalWithoutTitle = { ...validEvaluation };
+    delete evalWithoutTitle.rubricTitle;
+    await writeFeedback(dir, evalWithoutTitle, 'ca');
+    const content = await readFile(join(dir, 'feedback_ca.txt'), 'utf8');
+    assert.ok(!content.includes('undefined'), 'should not write the string "undefined" to file');
+  });
+
   it('writeFeedback handles undefined evaluatedAt without writing "undefined"', async () => {
     const dir = ensureStudentDir(tmpBase, 'no_date_student');
     const evalWithoutDate = { ...validEvaluation };

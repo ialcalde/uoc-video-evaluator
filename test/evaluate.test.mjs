@@ -482,6 +482,49 @@ describe('evaluate', () => {
     assert.ok(rubricText.includes('Grading scale'), 'unknown language should fall back to English grading scale label');
   });
 
+  it('defaults to "ca" when rubric.feedbackLanguage is absent', async () => {
+    let capturedSystem;
+    const rubricNoFbLang = { ...mockRubric };
+    delete rubricNoFbLang.feedbackLanguage;   // feedbackLanguage || 'ca' → 'ca'
+    const client = {
+      messages: {
+        stream: (params) => ({
+          finalMessage: async () => {
+            capturedSystem = params.system;
+            return { content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] };
+          },
+        }),
+        create: async () => ({ content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] }),
+      },
+    };
+
+    await evaluate(mockTranscript, rubricNoFbLang, client);
+    assert.ok(capturedSystem[0].text.includes('"ca"'), 'should fall back to "ca" in the system prompt');
+  });
+
+  it('defaults transcript block to "ca" when both rubric.language and feedbackLanguage are absent', async () => {
+    let capturedContent;
+    const bareRubric = { ...mockRubric };
+    delete bareRubric.language;
+    delete bareRubric.feedbackLanguage;   // both absent → || fallback chain reaches 'ca'
+    const client = {
+      messages: {
+        stream: (params) => ({
+          finalMessage: async () => {
+            capturedContent = params.messages[0].content;
+            return { content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] };
+          },
+        }),
+        create: async () => ({ content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] }),
+      },
+    };
+
+    await evaluate(mockTranscript, bareRubric, client);
+
+    const transcriptText = capturedContent[capturedContent.length - 1].text;
+    assert.ok(transcriptText.includes('(lang: ca)'), 'both absent → transcript lang defaults to ca');
+  });
+
   it('uses feedbackLanguage as transcript lang when rubric.language is absent', async () => {
     let capturedContent;
     const rubricNoLang = { ...mockRubric, feedbackLanguage: 'en' };
