@@ -194,9 +194,11 @@ export function validateRubric(rubric) {
     }
   }
 
-  // Grading scale must cover [0, 10] so every possible weighted score has a grade
-  const lowestMin  = Math.min(...rubric.gradingScale.map(g => g.min));
-  const highestMax = Math.max(...rubric.gradingScale.map(g => g.max));
+  // Grading scale must cover [0, 10] and have no gaps between adjacent entries.
+  const sorted     = [...rubric.gradingScale].sort((a, b) => a.min - b.min);
+  const lowestMin  = sorted[0].min;
+  const highestMax = sorted[sorted.length - 1].max;
+
   if (lowestMin > 0.01) {
     throw new Error(
       `gradingScale must cover 0.0 — lowest "min" is ${lowestMin}. ` +
@@ -208,6 +210,17 @@ export function validateRubric(rubric) {
       `gradingScale must cover 10.0 — highest "max" is ${highestMax}. ` +
       'Add an entry that ends at 10.'
     );
+  }
+
+  // Tolerance of 0.11 permits intentional 1-decimal-step boundaries (e.g. 4.9→5.0)
+  // while catching meaningful gaps (≥ 0.2 wide) that would silently mis-grade students.
+  for (let i = 1; i < sorted.length; i++) {
+    if (sorted[i].min > sorted[i - 1].max + 0.11) {
+      throw new Error(
+        `gradingScale has a gap: no entry covers scores between ` +
+        `${sorted[i - 1].max} and ${sorted[i].min}`
+      );
+    }
   }
 
   return rubric;

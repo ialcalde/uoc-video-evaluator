@@ -428,4 +428,34 @@ describe('validateRubric', () => {
     assert.doesNotThrow(() => validateRubric(good));
   });
 
+  // ── gradingScale gap detection ──────────────────────────────────────────────
+
+  it('throws when gradingScale has a gap between two entries', () => {
+    const bad = {
+      ...mockRubric,
+      gradingScale: [
+        { min: 0.0, max: 4.9, label: 'Fail' },
+        // 5.0–6.9 is missing
+        { min: 7.0, max: 10.0, label: 'Pass' },
+      ],
+    };
+    assert.throws(() => validateRubric(bad), /gap/i);
+  });
+
+  it('accepts a gradingScale with adjacent (touching) entries in any order', () => {
+    const good = {
+      ...mockRubric,
+      gradingScale: [
+        { min: 7.0, max: 10.0, label: 'Pass' },   // intentionally out-of-order
+        { min: 0.0, max: 7.0,  label: 'Fail' },
+      ],
+    };
+    assert.doesNotThrow(() => validateRubric(good));
+  });
+
+  it('accepts the standard decimal-step boundaries (0.1-wide) used by mockRubric', () => {
+    // 0.0–4.9, 5.0–6.9, 7.0–8.9, 9.0–10.0 — each adjacent pair has a 0.1 gap
+    assert.doesNotThrow(() => validateRubric(mockRubric));
+  });
+
 });
