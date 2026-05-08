@@ -311,61 +311,6 @@ collect_files() {
 }
 
 # ── Report renderers ───────────────────────────────────────────────────────────
-render_text() {
-  local out="${1:-/dev/stdout}"
-  {
-    echo -e "${BOLD}═══════════════════════════════════════════════════════${RESET}"
-    echo -e "${BOLD}            UOC Video Evaluator — Report               ${RESET}"
-    echo -e "${BOLD}═══════════════════════════════════════════════════════${RESET}"
-    echo ""
-
-    for result in "${RESULTS[@]}"; do
-      IFS='|' read -r filepath verdict checks_str <<< "$result"
-      echo -e "${BOLD}File:${RESET} $filepath"
-      if [[ "$verdict" == "PASS" ]]; then
-        echo -e "  ${BOLD}Overall:${RESET} ${GREEN}PASS${RESET}"
-      else
-        echo -e "  ${BOLD}Overall:${RESET} ${RED}FAIL${RESET}"
-      fi
-
-      if $VERBOSE || [[ "$verdict" == "FAIL" ]]; then
-        IFS=';' read -ra checks <<< "$checks_str"
-        for c in "${checks[@]}"; do
-          IFS='|' read -r status name msg <<< "$c"
-          if [[ "$status" == "PASS" ]]; then
-            echo -e "    ${GREEN}✔${RESET} ${name}: ${msg}"
-          else
-            echo -e "    ${RED}✘${RESET} ${BOLD}${name}: ${msg}${RESET}"
-          fi
-        done
-      fi
-      echo ""
-    done
-
-    echo -e "${BOLD}───────────────────────────────────────────────────────${RESET}"
-    echo -e "${BOLD}Summary:${RESET} ${TOTAL_FILES} file(s) evaluated"
-    echo -e "  ${GREEN}Passed: ${PASSED_FILES}${RESET}"
-    echo -e "  ${RED}Failed: ${FAILED_FILES}${RESET}"
-    echo -e "${BOLD}═══════════════════════════════════════════════════════${RESET}"
-  } | tee -a "$out" >/dev/null 2>&1 || {
-    # fallback: just print to stdout
-    for result in "${RESULTS[@]}"; do
-      IFS='|' read -r filepath verdict checks_str <<< "$result"
-      echo "File: $filepath  [$verdict]"
-      IFS=';' read -ra checks <<< "$checks_str"
-      for c in "${checks[@]}"; do
-        IFS='|' read -r status name msg <<< "$c"
-        echo "  [$status] $name: $msg"
-      done
-    done
-  }
-
-  # Always also print to stdout when a report file is set
-  if [[ -n "$REPORT_FILE" ]]; then
-    render_text_stdout
-  fi
-}
-
 render_text_stdout() {
   echo -e "${BOLD}═══════════════════════════════════════════════════════${RESET}"
   echo -e "${BOLD}            UOC Video Evaluator — Report               ${RESET}"

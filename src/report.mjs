@@ -83,9 +83,6 @@ export async function writeEvaluation(studentDir, evaluation) {
 }
 
 /**
- * Write feedback_ca.txt — human-readable summary in Catalan.
- */
-/**
  * Scan outputDir for student sub-directories with evaluation.json and rebuild results.csv.
  * Useful after a partial batch run or when adding new evaluations.
  *
