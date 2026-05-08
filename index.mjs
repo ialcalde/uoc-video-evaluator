@@ -208,16 +208,8 @@ async function main() {
       (totalTokens.cacheWrite ? ` cache-write=${totalTokens.cacheWrite}` : '')
     : null;
 
-  // Build per-student score table
+  // Build per-student score table — ok rows via info, error rows via error
   const colW = Math.max(20, ...results.map(r => r.student.length)) + 2;
-  const scoreLines = results.map(r => {
-    if (r.status === 'ok') {
-      const s    = String(r.evaluation.weightedScore).padEnd(6);
-      const name = r.student.padEnd(colW);
-      return `  ${name}${s}  ${r.evaluation.grade}`;
-    }
-    return `  ${r.student.padEnd(colW)}ERROR: ${r.error}`;
-  });
 
   console.log('');
   log.info('════════════════════════════════════════════════════════');
@@ -225,7 +217,15 @@ async function main() {
   log.info(`Elapsed   ${elapsedS}s`);
   if (tokensLine) log.info(tokensLine);
   log.info('────────────────────────────────────────────────────────');
-  for (const line of scoreLines) log.info(line);
+  for (const r of results) {
+    if (r.status === 'ok') {
+      const s    = String(r.evaluation.weightedScore).padEnd(6);
+      const name = r.student.padEnd(colW);
+      log.info(`  ${name}${s}  ${r.evaluation.grade}`);
+    } else {
+      log.error(`  ${r.student.padEnd(colW)}ERROR: ${r.error}`);
+    }
+  }
   log.info('────────────────────────────────────────────────────────');
   log.info(`CSV       ${csvPath}`);
   log.info(`Output    ${OUT_DIR}`);
