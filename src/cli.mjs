@@ -15,6 +15,7 @@ Usage:
 Options:
   --drive-folder <id>   Read videos from Google Drive (overrides GOOGLE_DRIVE_FOLDER_ID).
   --input-dir <path>    Read videos from a local directory (default: input_videos/).
+  --rubric <path>       Path to rubric JSON file (default: rubric.json in project root).
   --model <id>          Claude model to use (default: ${DEFAULT_MODEL}, overrides ANTHROPIC_MODEL).
   --skip-existing       Skip students whose evaluation.json already exists.
   --concurrency <n>     Process up to N students in parallel (default: 3).
@@ -35,6 +36,7 @@ Examples:
   node index.mjs
   node index.mjs --drive-folder 1AbCdEfGhIjKlMnOpQrStUvWxYz
   node index.mjs --input-dir /media/usb/videos --output-dir /tmp/results
+  node index.mjs --rubric ~/rubrics/advanced-presentation.json
   node index.mjs --skip-existing --concurrency 5
   node index.mjs --model claude-opus-4-7 --dry-run
 `.trim();
@@ -45,6 +47,7 @@ Examples:
  * Supported flags:
  *   --drive-folder <id>   Google Drive folder ID (overrides GOOGLE_DRIVE_FOLDER_ID).
  *   --input-dir <path>    Local video source directory (default: input_videos/).
+ *   --rubric <path>       Rubric JSON file path (default: rubric.json in project root).
  *   --model <id>          Claude model to use (overrides ANTHROPIC_MODEL, default claude-opus-4-7).
  *   --skip-existing       Skip students with an existing evaluation.json.
  *   --concurrency <n>     Max parallel video processing tasks (default 3).
@@ -56,9 +59,10 @@ Examples:
  *
  * @param {string[]} argv         Typically process.argv.
  * @param {Function} [onUnknown]  Called with each unrecognised flag string (default: console.warn).
- * @returns {{ driveFolderId: string|null, inputDir: string|null, model: string,
- *             skipExisting: boolean, concurrency: number, outputDir: string|null,
- *             dryRun: boolean, rebuildCsv: boolean, thinking: boolean, help: boolean }}
+ * @returns {{ driveFolderId: string|null, inputDir: string|null, rubric: string|null,
+ *             model: string, skipExisting: boolean, concurrency: number,
+ *             outputDir: string|null, dryRun: boolean, rebuildCsv: boolean,
+ *             thinking: boolean, help: boolean }}
  */
 export function parseArgs(argv, onUnknown = flag => console.warn(`[WARN]  Unknown flag: ${flag}`)) {
   const args = argv.slice(2);
@@ -66,13 +70,15 @@ export function parseArgs(argv, onUnknown = flag => console.warn(`[WARN]  Unknow
 
   // Flags that require a following value — used to give a better error than "unknown flag"
   // when the user forgets to supply the value (e.g. `--model` at end of argv).
-  const REQUIRES_VALUE = new Set(['--drive-folder', '--input-dir', '--model', '--concurrency', '--output-dir']);
+  const REQUIRES_VALUE = new Set(['--drive-folder', '--input-dir', '--rubric', '--model', '--concurrency', '--output-dir']);
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--drive-folder' && args[i + 1]) {
       opts.driveFolderId = args[++i];
     } else if (args[i] === '--input-dir' && args[i + 1]) {
       opts.inputDir = args[++i];
+    } else if (args[i] === '--rubric' && args[i + 1]) {
+      opts.rubric = args[++i];
     } else if (args[i] === '--model' && args[i + 1]) {
       opts.model = args[++i];
     } else if (args[i] === '--skip-existing') {
@@ -101,6 +107,7 @@ export function parseArgs(argv, onUnknown = flag => console.warn(`[WARN]  Unknow
   // Env-var fallback and defaults
   opts.driveFolderId ??= process.env.GOOGLE_DRIVE_FOLDER_ID || null;
   opts.inputDir      ??= null;   // null → use the default input_videos/ path in index.mjs
+  opts.rubric        ??= null;   // null → use rubric.json in project root
   opts.model         ??= process.env.ANTHROPIC_MODEL || DEFAULT_MODEL;
   opts.skipExisting  ??= false;
   opts.concurrency   ??= 3;

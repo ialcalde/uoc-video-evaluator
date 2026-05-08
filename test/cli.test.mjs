@@ -65,6 +65,17 @@ describe('parseArgs', () => {
     assert.equal(parseArgs(argv()).inputDir, null);
   });
 
+  // ── --rubric ──────────────────────────────────────────────────────────────
+
+  it('parses --rubric', () => {
+    const opts = parseArgs(argv('--rubric', '/data/rubrics/advanced.json'));
+    assert.equal(opts.rubric, '/data/rubrics/advanced.json');
+  });
+
+  it('defaults rubric to null when flag is absent', () => {
+    assert.equal(parseArgs(argv()).rubric, null);
+  });
+
   // ── --skip-existing ───────────────────────────────────────────────────────
 
   it('parses --skip-existing', () => {
@@ -172,8 +183,8 @@ describe('parseArgs', () => {
 
   it('USAGE string includes all supported flags', () => {
     for (const flag of [
-      '--drive-folder', '--input-dir', '--model', '--skip-existing', '--concurrency',
-      '--output-dir', '--dry-run', '--rebuild-csv', '--thinking',
+      '--drive-folder', '--input-dir', '--rubric', '--model', '--skip-existing',
+      '--concurrency', '--output-dir', '--dry-run', '--rebuild-csv', '--thinking',
       '--version', '--help',
     ]) {
       assert.ok(USAGE.includes(flag), `USAGE should mention ${flag}`);
@@ -217,7 +228,7 @@ describe('parseArgs', () => {
   });
 
   it('calls onUnknown with a "requires a value" message when a value-flag has no argument', () => {
-    for (const flag of ['--drive-folder', '--input-dir', '--model', '--concurrency', '--output-dir']) {
+    for (const flag of ['--drive-folder', '--input-dir', '--rubric', '--model', '--concurrency', '--output-dir']) {
       const msgs = [];
       parseArgs(argv(flag), msg => msgs.push(msg));   // flag is the last token — no value follows
       assert.ok(

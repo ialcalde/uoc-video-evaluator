@@ -71,8 +71,9 @@ const log = {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 async function main() {
-  const { driveFolderId, inputDir, model, thinking, skipExisting, concurrency,
-          outputDir, dryRun, rebuildCsv: doRebuild, version, help } =
+  const { driveFolderId, inputDir, rubric: rubricFile, model, thinking,
+          skipExisting, concurrency, outputDir, dryRun,
+          rebuildCsv: doRebuild, version, help } =
     parseArgs(process.argv, flag => log.warn(`Unknown flag ignored: ${flag}`));
 
   if (version) {
@@ -86,16 +87,17 @@ async function main() {
   if (!existsSync(OUT_DIR)) mkdirSync(OUT_DIR, { recursive: true });
 
   // ── Load and validate rubric (before env-var check — no API needed for this)
-  const rubricPath = join(__dirname, 'rubric.json');
+  const rubricPath = rubricFile ?? join(__dirname, 'rubric.json');
   if (!existsSync(rubricPath)) {
-    log.error('rubric.json not found in project root. Create it to define your evaluation criteria.');
+    log.error(`rubric.json not found: ${rubricPath}`);
+    log.error(rubricFile ? 'Check the --rubric path.' : 'Create rubric.json in the project root or use --rubric <path>.');
     process.exit(1);
   }
   const rubric = JSON.parse(await readFile(rubricPath, 'utf8'));
   try {
     validateRubric(rubric);
   } catch (err) {
-    log.error(`Invalid rubric.json: ${err.message}`);
+    log.error(`Invalid rubric (${rubricPath}): ${err.message}`);
     process.exit(1);
   }
 
