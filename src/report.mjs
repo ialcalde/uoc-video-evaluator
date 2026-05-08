@@ -128,12 +128,16 @@ export async function writeFeedback(studentDir, evaluation, lang = 'ca') {
   const student = basename(studentDir);
   const SEP     = '══════════════════════════════════════════════════════';
 
+  const colW = Math.max(
+    t.rubric.length, t.student.length, t.evaluatedAt.length, t.score.length, t.grade.length
+  ) + 2;
+
   const lines = [
-    `${t.rubric.padEnd(16)} : ${evaluation.rubricTitle ?? ''}`,
-    `${t.student.padEnd(16)} : ${student}`,
-    `${t.evaluatedAt.padEnd(16)} : ${evaluation.evaluatedAt}`,
-    `${t.score.padEnd(16)} : ${evaluation.weightedScore} / 10`,
-    `${t.grade.padEnd(16)} : ${evaluation.grade}`,
+    `${t.rubric.padEnd(colW)} : ${evaluation.rubricTitle ?? ''}`,
+    `${t.student.padEnd(colW)} : ${student}`,
+    `${t.evaluatedAt.padEnd(colW)} : ${evaluation.evaluatedAt}`,
+    `${t.score.padEnd(colW)} : ${evaluation.weightedScore} / 10`,
+    `${t.grade.padEnd(colW)} : ${evaluation.grade}`,
     '',
     SEP,
     t.criteria,

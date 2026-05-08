@@ -15,7 +15,8 @@ export async function withRetry(fn, { maxRetries = 4, baseDelay = 1_000, onRetry
     } catch (err) {
       const status = err.status ?? err.statusCode;
       if (attempt >= maxRetries || !RETRYABLE.has(status)) throw err;
-      const delayMs = Math.round(baseDelay * 2 ** attempt + Math.random() * 200);
+      const jitter  = baseDelay > 0 ? Math.floor(Math.random() * 200) : 0;
+      const delayMs = baseDelay * 2 ** attempt + jitter;
       onRetry?.({ attempt: attempt + 1, maxRetries, status, delayMs });
       await new Promise(r => setTimeout(r, delayMs));
     }

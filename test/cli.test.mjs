@@ -160,7 +160,11 @@ describe('parseArgs', () => {
   });
 
   it('USAGE string includes all supported flags', () => {
-    for (const flag of ['--drive-folder', '--model', '--skip-existing', '--concurrency', '--output-dir', '--dry-run', '--help']) {
+    for (const flag of [
+      '--drive-folder', '--model', '--skip-existing', '--concurrency',
+      '--output-dir', '--dry-run', '--rebuild-csv', '--thinking',
+      '--version', '--help',
+    ]) {
       assert.ok(USAGE.includes(flag), `USAGE should mention ${flag}`);
     }
   });

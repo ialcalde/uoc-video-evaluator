@@ -126,6 +126,22 @@ describe('report', () => {
     assert.ok(content.includes(validEvaluation.overallFeedback), 'feedback text should appear');
   });
 
+  it('writeFeedback aligns header columns consistently for Spanish (long labels)', async () => {
+    const dir = ensureStudentDir(tmpBase, 'feedback_es_student');
+    await writeFeedback(dir, validEvaluation, 'es');
+
+    const content = await readFile(join(dir, 'feedback_es.txt'), 'utf8');
+    const headerLines = content.split('\n').slice(0, 5);
+
+    // Every header line should contain ' : ' at the same position
+    const colonPositions = headerLines.map(line => line.indexOf(' : '));
+    const allSame = colonPositions.every(p => p === colonPositions[0]);
+    assert.ok(allSame, `Columns not aligned — ' : ' positions: ${colonPositions.join(', ')}`);
+
+    // The longest Spanish label is 'Fecha de evaluación' (19 chars); colW = 21
+    assert.ok(colonPositions[0] >= 19, 'column separator should be after the longest label');
+  });
+
   it('writeFeedback falls back to English headings for unknown lang', async () => {
     const dir = ensureStudentDir(tmpBase, 'feedback_de_student');
     await writeFeedback(dir, validEvaluation, 'de');
