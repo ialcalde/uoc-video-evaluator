@@ -51,14 +51,18 @@ Examples:
  *   --thinking            Enable adaptive thinking for the Claude evaluation call.
  *   --help, -h            Print usage and exit.
  *
- * @param {string[]} argv  Typically process.argv.
+ * @param {string[]} argv         Typically process.argv.
+ * @param {Function} [onUnknown]  Called with each unrecognised flag string (default: console.warn).
  * @returns {{ driveFolderId: string|null, model: string, skipExisting: boolean,
  *             concurrency: number, outputDir: string|null, dryRun: boolean,
  *             rebuildCsv: boolean, thinking: boolean, help: boolean }}
  */
-export function parseArgs(argv) {
+export function parseArgs(argv, onUnknown = flag => console.warn(`[WARN]  Unknown flag: ${flag}`)) {
   const args = argv.slice(2);
   const opts = {};
+
+  // Flags that consume the next argument as their value
+  const VALUE_FLAGS = new Set(['--drive-folder', '--model', '--concurrency', '--output-dir']);
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--drive-folder' && args[i + 1]) {
@@ -81,6 +85,10 @@ export function parseArgs(argv) {
       opts.thinking = true;
     } else if (args[i] === '--help' || args[i] === '-h') {
       opts.help = true;
+    } else if (args[i].startsWith('-')) {
+      onUnknown(args[i]);
+      // Skip the following argument if this flag looks like it takes a value
+      if (VALUE_FLAGS.has(args[i]) && args[i + 1]) i++;
     }
   }
 

@@ -14,18 +14,19 @@ export function csvField(value) {
 /**
  * Write results.csv to outputDir.
  *
- * Each row: student, score, grade, status, <one column per criterion>, error
+ * Each row: student, score, grade, status, <one column per criterion>, overallFeedback, error
  * Returns the full path of the written file.
  */
 export async function writeCsv(outputDir, results, rubric) {
   const criteriaIds = rubric.criteria.map(c => c.id);
-  const header = ['student', 'score', 'grade', 'status', ...criteriaIds, 'error'].join(',');
+  const header = ['student', 'score', 'grade', 'status', ...criteriaIds, 'overallFeedback', 'error'].join(',');
 
   const rows = results.map(r => {
     if (r.status === 'error') {
       return [
         csvField(r.student), '', '', 'error',
         ...criteriaIds.map(() => ''),
+        '',
         csvField(r.error),
       ].join(',');
     }
@@ -39,6 +40,7 @@ export async function writeCsv(outputDir, results, rubric) {
       csvField(r.evaluation.grade),
       'ok',
       ...criteriaIds.map(id => scoreMap[id] ?? ''),
+      csvField(r.evaluation.overallFeedback ?? ''),
       '',
     ].join(',');
   });

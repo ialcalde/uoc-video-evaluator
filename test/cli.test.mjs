@@ -167,6 +167,36 @@ describe('parseArgs', () => {
 
   // ── Combined flags ────────────────────────────────────────────────────────
 
+  // ── Unknown flags ─────────────────────────────────────────────────────────
+
+  it('calls onUnknown for unrecognised flags starting with -', () => {
+    const unknown = [];
+    parseArgs(argv('--typo-flag'), flag => unknown.push(flag));
+    assert.deepEqual(unknown, ['--typo-flag']);
+  });
+
+  it('does not call onUnknown for recognised flags', () => {
+    const unknown = [];
+    parseArgs(argv('--skip-existing', '--dry-run'), flag => unknown.push(flag));
+    assert.deepEqual(unknown, []);
+  });
+
+  it('does not emit a warning for bare arguments (non-flag tokens)', () => {
+    const unknown = [];
+    parseArgs(argv('somevalue'), flag => unknown.push(flag));
+    assert.deepEqual(unknown, [], 'non-flag tokens are not treated as unknown flags');
+  });
+
+  it('warns once per unknown flag when multiple unrecognised flags are passed', () => {
+    const unknown = [];
+    parseArgs(argv('--bad-one', '--bad-two'), flag => unknown.push(flag));
+    assert.equal(unknown.length, 2);
+    assert.ok(unknown.includes('--bad-one'));
+    assert.ok(unknown.includes('--bad-two'));
+  });
+
+  // ── Combined flags ────────────────────────────────────────────────────────
+
   it('parses multiple flags together', () => {
     delete process.env.GOOGLE_DRIVE_FOLDER_ID;
     const opts = parseArgs(argv(
