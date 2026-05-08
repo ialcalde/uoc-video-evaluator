@@ -71,8 +71,8 @@ const log = {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 async function main() {
-  const { driveFolderId, model, thinking, skipExisting, concurrency, outputDir,
-          dryRun, rebuildCsv: doRebuild, version, help } =
+  const { driveFolderId, inputDir, model, thinking, skipExisting, concurrency,
+          outputDir, dryRun, rebuildCsv: doRebuild, version, help } =
     parseArgs(process.argv, flag => log.warn(`Unknown flag ignored: ${flag}`));
 
   if (version) {
@@ -122,6 +122,7 @@ async function main() {
 
   // ── Collect videos ──────────────────────────────────────────────────────────
   let entries;
+  const IN_DIR = inputDir ?? INPUT_DIR;
 
   if (driveFolderId) {
     log.info(`Source: Google Drive (folder: ${driveFolderId})`);
@@ -129,14 +130,19 @@ async function main() {
     const drive = createDriveClient(auth);
     entries = await collectDriveVideos(driveFolderId, drive, { tmpDir: TMP_DIR, log });
   } else {
-    log.info('Source: local input_videos/');
-    entries = collectLocalVideos(INPUT_DIR);
+    if (!existsSync(IN_DIR)) {
+      log.error(`Input directory not found: ${IN_DIR}`);
+      log.error(inputDir ? 'Check the --input-dir path.' : 'Create input_videos/ or use --input-dir <path>.');
+      process.exit(1);
+    }
+    log.info(`Source: local ${IN_DIR}`);
+    entries = collectLocalVideos(IN_DIR);
   }
 
   if (entries.length === 0) {
     if (!driveFolderId) {
-      log.warn('No video files found in input_videos/.');
-      log.warn('Add .mp4 / .mov / .mkv / .avi / .webm files, or use --drive-folder <id>.');
+      log.warn(`No video files found in ${IN_DIR}.`);
+      log.warn('Add .mp4 / .mov / .mkv / .avi / .webm / .wmv files, or use --drive-folder <id>.');
     }
     process.exit(0);
   }

@@ -54,6 +54,17 @@ describe('parseArgs', () => {
     assert.equal(opts.driveFolderId, 'cli-folder-id');
   });
 
+  // ── --input-dir ───────────────────────────────────────────────────────────
+
+  it('parses --input-dir', () => {
+    const opts = parseArgs(argv('--input-dir', '/media/usb/videos'));
+    assert.equal(opts.inputDir, '/media/usb/videos');
+  });
+
+  it('defaults inputDir to null when flag is absent', () => {
+    assert.equal(parseArgs(argv()).inputDir, null);
+  });
+
   // ── --skip-existing ───────────────────────────────────────────────────────
 
   it('parses --skip-existing', () => {
@@ -161,7 +172,7 @@ describe('parseArgs', () => {
 
   it('USAGE string includes all supported flags', () => {
     for (const flag of [
-      '--drive-folder', '--model', '--skip-existing', '--concurrency',
+      '--drive-folder', '--input-dir', '--model', '--skip-existing', '--concurrency',
       '--output-dir', '--dry-run', '--rebuild-csv', '--thinking',
       '--version', '--help',
     ]) {
@@ -206,7 +217,7 @@ describe('parseArgs', () => {
   });
 
   it('calls onUnknown with a "requires a value" message when a value-flag has no argument', () => {
-    for (const flag of ['--drive-folder', '--model', '--concurrency', '--output-dir']) {
+    for (const flag of ['--drive-folder', '--input-dir', '--model', '--concurrency', '--output-dir']) {
       const msgs = [];
       parseArgs(argv(flag), msg => msgs.push(msg));   // flag is the last token — no value follows
       assert.ok(
@@ -230,12 +241,14 @@ describe('parseArgs', () => {
     delete process.env.GOOGLE_DRIVE_FOLDER_ID;
     const opts = parseArgs(argv(
       '--drive-folder', 'f1',
+      '--input-dir', '/videos',
       '--skip-existing',
       '--concurrency', '4',
       '--output-dir', '/out',
       '--dry-run',
     ));
     assert.equal(opts.driveFolderId, 'f1');
+    assert.equal(opts.inputDir,      '/videos');
     assert.equal(opts.skipExisting,  true);
     assert.equal(opts.concurrency,   4);
     assert.equal(opts.outputDir,     '/out');
