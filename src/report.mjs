@@ -137,7 +137,7 @@ export async function writeFeedback(studentDir, evaluation, lang = 'ca') {
   const lines = [
     `${t.rubric.padEnd(colW)} : ${evaluation.rubricTitle ?? ''}`,
     `${t.student.padEnd(colW)} : ${student}`,
-    `${t.evaluatedAt.padEnd(colW)} : ${evaluation.evaluatedAt}`,
+    `${t.evaluatedAt.padEnd(colW)} : ${evaluation.evaluatedAt ?? ''}`,
     `${t.score.padEnd(colW)} : ${evaluation.weightedScore} / 10`,
     `${t.grade.padEnd(colW)} : ${evaluation.grade}`,
     '',

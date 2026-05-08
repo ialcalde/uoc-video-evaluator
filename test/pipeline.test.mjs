@@ -71,6 +71,60 @@ describe('processVideo', () => {
     assert.equal(transcribeCalled, false, 'should not call Whisper when skipping');
   });
 
+  it('does not skip when skipExisting=true but evaluation.json is absent', async () => {
+    const student = 'no_eval_skip_student';
+    // feedback file exists but evaluation.json does not
+    const studentDir = join(outDir, student);
+    mkdirSync(studentDir, { recursive: true });
+    writeFileSync(join(studentDir, 'feedback_ca.txt'), 'old feedback', 'utf8');
+
+    let transcribeCalled = false;
+    const trackingTranscribe = async () => { transcribeCalled = true; return { text: 'x', segments: [] }; };
+
+    await processVideo({
+      videoPath:      '/fake/video.mp4',
+      student,
+      anthropic:      makeAnthropic(),
+      openai:         {},
+      rubric:         mockRubric,
+      outputDir:      outDir,
+      tmpDir,
+      skipExisting:   true,
+      log:            noop,
+      extractAudioFn: noopExtract,
+      transcribeFn:   trackingTranscribe,
+    });
+
+    assert.equal(transcribeCalled, true, 'should call Whisper when evaluation.json is absent');
+  });
+
+  it('does not skip when skipExisting=true but feedback file is absent', async () => {
+    const student = 'no_feedback_skip_student';
+    // evaluation.json exists but feedback file does not
+    const studentDir = join(outDir, student);
+    mkdirSync(studentDir, { recursive: true });
+    writeFileSync(join(studentDir, 'evaluation.json'), JSON.stringify(validEvaluation), 'utf8');
+
+    let transcribeCalled = false;
+    const trackingTranscribe = async () => { transcribeCalled = true; return { text: 'x', segments: [] }; };
+
+    await processVideo({
+      videoPath:      '/fake/video.mp4',
+      student,
+      anthropic:      makeAnthropic(),
+      openai:         {},
+      rubric:         mockRubric,
+      outputDir:      outDir,
+      tmpDir,
+      skipExisting:   true,
+      log:            noop,
+      extractAudioFn: noopExtract,
+      transcribeFn:   trackingTranscribe,
+    });
+
+    assert.equal(transcribeCalled, true, 'should call Whisper when feedback file is absent');
+  });
+
   it('does not skip when skipExisting=false even if evaluation.json exists', async () => {
     const student    = 'no_skip_student';
     const studentDir = join(outDir, student);
@@ -184,6 +238,24 @@ describe('processVideo', () => {
     );
   });
 
+  it('throws when transcript has no text property at all', async () => {
+    await assert.rejects(
+      () => processVideo({
+        videoPath:      '/fake/video.mp4',
+        student:        'no_text_field_student',
+        anthropic:      makeAnthropic(),
+        openai:         {},
+        rubric:         mockRubric,
+        outputDir:      outDir,
+        tmpDir,
+        log:            noop,
+        extractAudioFn: noopExtract,
+        transcribeFn:   async () => ({ segments: [] }),  // no text field → text is undefined
+      }),
+      /Transcription is empty/i
+    );
+  });
+
   it('throws when transcript text is only whitespace', async () => {
     await assert.rejects(
       () => processVideo({
@@ -279,6 +351,77 @@ describe('processVideo', () => {
 
     const filesAfter = readdirSync(tmpDir);
     assert.equal(filesAfter.length, filesBefore.length, 'no new temp files after success');
+  });
+
+  // ── log.warn forwarding via onRetry ──────────────────────────────────────────
+
+  it('forwards transcribe retry events to log.warn', async () => {
+    const student = 'transcribe_warn_student';
+    const warnMessages = [];
+    const warnLog = { ...noop, warn: msg => warnMessages.push(msg) };
+
+    // A transcribeFn that fires the onRetry callback once, then succeeds.
+    // This exercises the log.warn?.() branch inside pipeline.mjs.
+    const retryingTranscribe = async (_path, _openai, opts) => {
+      opts?.onRetry?.({ attempt: 1, maxRetries: 4, status: 429, delayMs: 0 });
+      return { text: 'Hola.', segments: [] };
+    };
+
+    await processVideo({
+      videoPath:      '/fake/video.mp4',
+      student,
+      anthropic:      makeAnthropic(),
+      openai:         {},
+      rubric:         mockRubric,
+      outputDir:      outDir,
+      tmpDir,
+      log:            warnLog,
+      extractAudioFn: noopExtract,
+      transcribeFn:   retryingTranscribe,
+    });
+
+    assert.ok(warnMessages.length > 0, 'should have produced at least one warning');
+    assert.ok(warnMessages[0].includes('429'), 'warning should mention the HTTP status');
+  });
+
+  it('forwards evaluate retry events to log.warn', async () => {
+    const student = 'eval_warn_student';
+    const warnMessages = [];
+    const warnLog = { ...noop, warn: msg => warnMessages.push(msg) };
+
+    let streamCalls = 0;
+    const retryingAnthropic = {
+      messages: {
+        stream: () => ({
+          finalMessage: async () => {
+            streamCalls++;
+            if (streamCalls === 1) {
+              const e = new Error('rate limited');
+              e.status = 429;
+              throw e;
+            }
+            return { content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] };
+          },
+        }),
+        create: async () => ({ content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] }),
+      },
+    };
+
+    await processVideo({
+      videoPath:      '/fake/video.mp4',
+      student,
+      anthropic:      retryingAnthropic,
+      openai:         {},
+      rubric:         mockRubric,
+      outputDir:      outDir,
+      tmpDir,
+      log:            warnLog,
+      extractAudioFn: noopExtract,
+      transcribeFn:   makeTranscribe(),
+    });
+
+    assert.ok(warnMessages.length > 0, 'should have produced at least one warning');
+    assert.ok(warnMessages[0].includes('429'), 'warning should mention the HTTP status');
   });
 
   // ── Language-aware filenames ──────────────────────────────────────────────────
@@ -403,6 +546,37 @@ describe('processVideo', () => {
 
     assert.deepEqual(result.tokenUsage, fakeUsage);
     assert.equal(result.evaluation.weightedScore, validEvaluation.weightedScore);
+  });
+
+  it('logs cache-write in token summary when cache_creation_input_tokens > 0', async () => {
+    const fakeUsage = { input_tokens: 400, output_tokens: 80,
+                        cache_read_input_tokens: 0, cache_creation_input_tokens: 200 };
+    const trackingAnthropic = {
+      messages: {
+        stream: () => ({
+          finalMessage: async () => ({
+            content: [{ type: 'text', text: JSON.stringify(validEvaluation) }],
+            usage:   fakeUsage,
+          }),
+        }),
+        create: async () => ({ content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] }),
+      },
+    };
+
+    const result = await processVideo({
+      videoPath:      '/fake/video.mp4',
+      student:        'cache_write_student',
+      anthropic:      trackingAnthropic,
+      openai:         {},
+      rubric:         mockRubric,
+      outputDir:      outDir,
+      tmpDir,
+      log:            noop,
+      extractAudioFn: noopExtract,
+      transcribeFn:   makeTranscribe(),
+    });
+
+    assert.deepEqual(result.tokenUsage, fakeUsage);
   });
 
   it('returns tokenUsage:null when skipExisting returns from cache', async () => {
