@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readdirSync } from 'fs';
 import { readFile, writeFile } from 'fs/promises';
-import { join } from 'path';
+import { join, basename } from 'path';
 
 // ── CSV helpers ───────────────────────────────────────────────────────────────
 
@@ -111,9 +111,9 @@ export async function rebuildCsv(outputDir, rubric) {
 }
 
 const I18N = {
-  ca: { evaluatedAt: "Data d'avaluació", score: 'Nota',    grade: 'Qualificació', criteria: 'DETALL PER CRITERI', overall: 'VALORACIÓ GLOBAL',  weight: 'pes', scoreLabel: 'Puntuació' },
-  es: { evaluatedAt: 'Fecha de evaluación', score: 'Nota', grade: 'Calificación', criteria: 'DETALLE POR CRITERIO', overall: 'VALORACIÓN GLOBAL', weight: 'peso', scoreLabel: 'Puntuación' },
-  en: { evaluatedAt: 'Evaluation date',   score: 'Score', grade: 'Grade',        criteria: 'CRITERIA DETAIL',     overall: 'OVERALL FEEDBACK',   weight: 'weight', scoreLabel: 'Score' },
+  ca: { student: 'Estudiant', rubric: 'Rúbrica',   evaluatedAt: "Data d'avaluació", score: 'Nota',    grade: 'Qualificació', criteria: 'DETALL PER CRITERI',     overall: 'VALORACIÓ GLOBAL',  weight: 'pes',    scoreLabel: 'Puntuació'  },
+  es: { student: 'Estudiante', rubric: 'Rúbrica',  evaluatedAt: 'Fecha de evaluación', score: 'Nota', grade: 'Calificación', criteria: 'DETALLE POR CRITERIO',   overall: 'VALORACIÓN GLOBAL', weight: 'peso',   scoreLabel: 'Puntuación' },
+  en: { student: 'Student',    rubric: 'Rubric',   evaluatedAt: 'Evaluation date',   score: 'Score', grade: 'Grade',        criteria: 'CRITERIA DETAIL',         overall: 'OVERALL FEEDBACK',   weight: 'weight', scoreLabel: 'Score'      },
 };
 
 /**
@@ -124,11 +124,14 @@ const I18N = {
  * @param {string} [lang='ca']  BCP-47 language code used for both filename and labels.
  */
 export async function writeFeedback(studentDir, evaluation, lang = 'ca') {
-  const t = I18N[lang] ?? I18N.en;
-  const SEP = '══════════════════════════════════════════════════════';
+  const t       = I18N[lang] ?? I18N.en;
+  const student = basename(studentDir);
+  const SEP     = '══════════════════════════════════════════════════════';
 
   const lines = [
-    `${t.evaluatedAt} : ${evaluation.evaluatedAt}`,
+    `${t.rubric.padEnd(16)} : ${evaluation.rubricTitle ?? ''}`,
+    `${t.student.padEnd(16)} : ${student}`,
+    `${t.evaluatedAt.padEnd(16)} : ${evaluation.evaluatedAt}`,
     `${t.score.padEnd(16)} : ${evaluation.weightedScore} / 10`,
     `${t.grade.padEnd(16)} : ${evaluation.grade}`,
     '',

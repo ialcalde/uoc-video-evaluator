@@ -93,6 +93,15 @@ describe('report', () => {
     );
   });
 
+  it('feedback file includes rubric title and student name in the header', async () => {
+    const dir = ensureStudentDir(tmpBase, 'feedback_header_student');
+    await writeFeedback(dir, validEvaluation, 'ca');
+
+    const content = await readFile(join(dir, 'feedback_ca.txt'), 'utf8');
+    assert.ok(content.includes(validEvaluation.rubricTitle), 'should include rubric title');
+    assert.ok(content.includes('feedback_header_student'),   'should include student name from directory');
+  });
+
   it('includes each criterion name and justification in feedback_ca.txt', async () => {
     const dir = ensureStudentDir(tmpBase, 'feedback_criteria_student');
     await writeFeedback(dir, validEvaluation, 'ca');
