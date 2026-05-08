@@ -103,9 +103,35 @@ describe('evaluate', () => {
 
     const systemText  = capturedSystem[0].text;
     const rubricText  = capturedContent[0].text;
-    assert.ok(systemText.includes('"en"'),  'system prompt should embed feedbackLanguage code');
-    assert.ok(rubricText.includes('"en"'),  'rubric block should embed feedbackLanguage code');
-    assert.ok(!systemText.includes('CATALÀ'), 'should not contain hardcoded CATALÀ when lang=en');
+    assert.ok(systemText.includes('"en"'),       'system prompt should embed feedbackLanguage code');
+    assert.ok(rubricText.includes('"en"'),       'rubric block should embed feedbackLanguage code');
+    assert.ok(!systemText.includes('CATALÀ'),    'should not contain hardcoded CATALÀ when lang=en');
+    assert.ok(rubricText.includes('Rubric:'),    'rubric block should use English "Rubric:" label');
+    assert.ok(rubricText.includes('Grading scale'), 'rubric block should use English scale label');
+  });
+
+  it('uses Spanish structural labels when feedbackLanguage is "es"', async () => {
+    let capturedSystem, capturedContent;
+    const esRubric = { ...mockRubric, feedbackLanguage: 'es' };
+    const client = {
+      messages: {
+        stream: (params) => ({
+          finalMessage: async () => {
+            capturedSystem  = params.system;
+            capturedContent = params.messages[0].content;
+            return { content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] };
+          },
+        }),
+        create: async () => ({ content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] }),
+      },
+    };
+
+    await evaluate(mockTranscript, esRubric, client);
+
+    const rubricText = capturedContent[0].text;
+    assert.ok(rubricText.includes('Rúbrica:'),           'should use Spanish "Rúbrica:" label');
+    assert.ok(rubricText.includes('calificaci'),         'should use Spanish grading scale label');
+    assert.ok(rubricText.includes('Evalúa'),             'should use Spanish evaluation instruction');
   });
 
   it('includes thinking:{type:"adaptive"} in call params when thinking=true', async () => {
