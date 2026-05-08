@@ -134,6 +134,33 @@ describe('evaluate', () => {
     assert.ok(rubricText.includes('Evalúa'),             'should use Spanish evaluation instruction');
   });
 
+  it('transcript block uses rubric.language for its label, rubric block uses feedbackLanguage', async () => {
+    let capturedContent;
+    // language='ca' → transcript label should be "Transcripció"
+    // feedbackLanguage='en' → rubric block should use English labels
+    const mixedRubric = { ...mockRubric, language: 'ca', feedbackLanguage: 'en' };
+    const client = {
+      messages: {
+        stream: (params) => ({
+          finalMessage: async () => {
+            capturedContent = params.messages[0].content;
+            return { content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] };
+          },
+        }),
+        create: async () => ({ content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] }),
+      },
+    };
+
+    await evaluate(mockTranscript, mixedRubric, client);
+
+    const rubricText     = capturedContent[0].text;
+    const transcriptText = capturedContent[capturedContent.length - 1].text;
+
+    assert.ok(rubricText.includes('Rubric:'),          'rubric block should use English label (feedbackLanguage=en)');
+    assert.ok(transcriptText.includes('Transcripci'),  'transcript label should be Catalan (language=ca)');
+    assert.ok(transcriptText.includes('(lang: ca)'),   'transcript block should embed the transcript language code');
+  });
+
   it('includes thinking:{type:"adaptive"} in call params when thinking=true', async () => {
     let capturedThinking;
     const client = {
