@@ -37,8 +37,9 @@ function runFfmpeg(videoPath, audioPath, audioFlags) {
 /**
  * Extract mono 16 kHz MP3 audio from a video file using ffmpeg.
  *
- * If the resulting file exceeds MAX_AUDIO_BYTES (Whisper's upload limit),
- * a second pass re-encodes at a lower bitrate to fit within the limit.
+ * If the resulting file exceeds MAX_AUDIO_BYTES (Whisper's 24 MB upload limit),
+ * up to two additional passes re-encode at lower bitrates (32 kbps, then 16 kbps).
+ * A clear error is thrown if the file is still too large after all passes.
  *
  * @param {string}   videoPath   Absolute path to the source video.
  * @param {string}   audioPath   Destination path for the .mp3 file.
@@ -49,10 +50,25 @@ function runFfmpeg(videoPath, audioPath, audioFlags) {
 export async function extractAudio(videoPath, audioPath, { ffmpegFn = runFfmpeg } = {}) {
   await ffmpegFn(videoPath, audioPath, ['-c:a', 'libmp3lame', '-q:a', '4']);
 
-  const { size } = statSync(audioPath);
+  let { size } = statSync(audioPath);
   if (size > MAX_AUDIO_BYTES) {
-    // Re-encode at 32 kbps — sufficient for speech; ~14 MB for a 60-min recording
+    // Pass 2: 32 kbps mono — ~14 MB for a 60-min recording
     await ffmpegFn(videoPath, audioPath, ['-c:a', 'libmp3lame', '-b:a', '32k']);
+    ({ size } = statSync(audioPath));
+  }
+
+  if (size > MAX_AUDIO_BYTES) {
+    // Pass 3: 16 kbps mono — ~7 MB for a 60-min recording; adequate for speech recognition
+    await ffmpegFn(videoPath, audioPath, ['-c:a', 'libmp3lame', '-b:a', '16k']);
+    ({ size } = statSync(audioPath));
+  }
+
+  if (size > MAX_AUDIO_BYTES) {
+    const mb = (size / 1_048_576).toFixed(1);
+    throw new Error(
+      `Audio file (${mb} MB) still exceeds Whisper's ${MAX_AUDIO_BYTES / 1_048_576} MB limit ` +
+      'after re-encoding at 16 kbps. The recording is too long to transcribe.'
+    );
   }
 
   return audioPath;

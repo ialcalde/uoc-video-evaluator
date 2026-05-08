@@ -118,6 +118,46 @@ describe('extractAudio', () => {
     }
   });
 
+  it('runs a third pass at 16 kbps when 32 kbps pass is still over limit', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'uoc-audio-test-'));
+    try {
+      const audioPath = join(tmp, 'audio.mp3');
+      let calls = 0;
+      const capturedFlags = [];
+
+      const mockFfmpeg = async (_src, dest, flags) => {
+        calls++;
+        capturedFlags.push([...flags]);
+        // Pass 1 & 2 oversized, pass 3 fits
+        writeFileSync(dest, Buffer.alloc(calls < 3 ? MAX_AUDIO_BYTES + 1 : 1024));
+      };
+
+      await extractAudio('/fake/video.mp4', audioPath, { ffmpegFn: mockFfmpeg });
+
+      assert.equal(calls, 3, 'should run ffmpeg three times');
+      assert.ok(capturedFlags[2].includes('16k'), 'third pass should target 16 kbps');
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it('throws a descriptive error when all three passes are still over the limit', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'uoc-audio-test-'));
+    try {
+      const audioPath = join(tmp, 'audio.mp3');
+      const mockFfmpeg = async (_src, dest) => {
+        writeFileSync(dest, Buffer.alloc(MAX_AUDIO_BYTES + 1));
+      };
+
+      await assert.rejects(
+        () => extractAudio('/fake/video.mp4', audioPath, { ffmpegFn: mockFfmpeg }),
+        /too long to transcribe/i
+      );
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
   it('MAX_AUDIO_BYTES is exported and equals 24 MB', () => {
     assert.equal(MAX_AUDIO_BYTES, 24 * 1024 * 1024);
   });
