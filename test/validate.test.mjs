@@ -548,4 +548,28 @@ describe('validateRubric', () => {
     assert.doesNotThrow(() => validateRubric(mockRubric));
   });
 
+  // ── gradingScale overlap detection ──────────────────────────────────────────
+
+  it('throws when two gradingScale entries share a score range (overlap)', () => {
+    const bad = {
+      ...mockRubric,
+      gradingScale: [
+        { min: 0.0, max: 5.5,  label: 'Fail' },  // overlaps with next entry below 5.5
+        { min: 4.5, max: 10.0, label: 'Pass' },
+      ],
+    };
+    assert.throws(() => validateRubric(bad), /overlap/i);
+  });
+
+  it('accepts entries that touch at a single boundary point (no shared range)', () => {
+    const good = {
+      ...mockRubric,
+      gradingScale: [
+        { min: 5.0, max: 10.0, label: 'Pass' },
+        { min: 0.0, max: 5.0,  label: 'Fail' },   // max of Fail == min of Pass (touching)
+      ],
+    };
+    assert.doesNotThrow(() => validateRubric(good));
+  });
+
 });

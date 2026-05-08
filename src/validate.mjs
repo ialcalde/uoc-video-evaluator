@@ -236,11 +236,19 @@ export function validateRubric(rubric) {
 
   // Tolerance of 0.11 permits intentional 1-decimal-step boundaries (e.g. 4.9→5.0)
   // while catching meaningful gaps (≥ 0.2 wide) that would silently mis-grade students.
+  // Overlap tolerance of 0.01 rejects shared ranges (> 0.01 wide) while allowing
+  // entries that merely touch at a single boundary point.
   for (let i = 1; i < sorted.length; i++) {
     if (sorted[i].min > sorted[i - 1].max + 0.11) {
       throw new Error(
         `gradingScale has a gap: no entry covers scores between ` +
         `${sorted[i - 1].max} and ${sorted[i].min}`
+      );
+    }
+    if (sorted[i].min < sorted[i - 1].max - 0.01) {
+      throw new Error(
+        `gradingScale has an overlap: "${sorted[i - 1].label}" (${sorted[i - 1].min}–${sorted[i - 1].max}) ` +
+        `and "${sorted[i].label}" (${sorted[i].min}–${sorted[i].max}) share a score range`
       );
     }
   }
