@@ -234,6 +234,14 @@ describe('validateEvaluation', () => {
     );
   });
 
+  // ── rubricTitle normalisation ──────────────────────────────────────────────
+
+  it('normalises rubricTitle to rubric.title regardless of what Claude returned', () => {
+    const ev = { ...validEvaluation, rubricTitle: 'Wrong Title From Claude' };
+    const result = validateEvaluation(toRaw(ev), mockRubric);
+    assert.equal(result.rubricTitle, mockRubric.title, 'rubricTitle should match rubric.title');
+  });
+
   // ── name normalisation ─────────────────────────────────────────────────────
 
   it('normalises criterion name to rubric nameEn regardless of what Claude returned', () => {

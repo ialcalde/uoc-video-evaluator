@@ -85,6 +85,9 @@ export function validateEvaluation(raw, rubric) {
   const rubricOrder = new Map(rubric.criteria.map(({ id }, i) => [id, i]));
   parsed.criteria.sort((a, b) => rubricOrder.get(a.id) - rubricOrder.get(b.id));
 
+  // Always use the rubric's canonical title regardless of what Claude returned.
+  parsed.rubricTitle = rubric.title;
+
   const computed       = parsed.criteria.reduce((s, c) => s + c.score * c.weight, 0);
   parsed.weightedScore = Math.round(computed * 100) / 100;
 
