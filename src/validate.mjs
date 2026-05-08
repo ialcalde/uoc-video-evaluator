@@ -102,6 +102,14 @@ export function validateRubric(rubric) {
     throw new Error('Rubric missing required string field: "title"');
   }
 
+  for (const field of ['language', 'feedbackLanguage']) {
+    if (rubric[field] !== undefined) {
+      if (typeof rubric[field] !== 'string' || !rubric[field].trim()) {
+        throw new Error(`"${field}" must be a non-empty BCP-47 string (e.g. "ca", "es", "en") when present`);
+      }
+    }
+  }
+
   if (!Array.isArray(rubric.criteria) || rubric.criteria.length === 0) {
     throw new Error('Rubric "criteria" must be a non-empty array');
   }
@@ -171,6 +179,22 @@ export function validateRubric(rubric) {
     if (typeof entry.label !== 'string' || !entry.label.trim()) {
       throw new Error(`${ctx}: "label" must be a non-empty string`);
     }
+  }
+
+  // Grading scale must cover [0, 10] so every possible weighted score has a grade
+  const lowestMin  = Math.min(...rubric.gradingScale.map(g => g.min));
+  const highestMax = Math.max(...rubric.gradingScale.map(g => g.max));
+  if (lowestMin > 0.01) {
+    throw new Error(
+      `gradingScale must cover 0.0 — lowest "min" is ${lowestMin}. ` +
+      'Add an entry that starts at 0.'
+    );
+  }
+  if (highestMax < 9.99) {
+    throw new Error(
+      `gradingScale must cover 10.0 — highest "max" is ${highestMax}. ` +
+      'Add an entry that ends at 10.'
+    );
   }
 
   return rubric;

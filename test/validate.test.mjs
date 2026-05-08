@@ -252,6 +252,23 @@ describe('validateRubric', () => {
     assert.throws(() => validateRubric({ ...mockRubric, criteria: null }), /non-empty array/i);
   });
 
+  it('throws when "language" is present but not a non-empty string', () => {
+    assert.throws(() => validateRubric({ ...mockRubric, language: 42 }),   /language/i);
+    assert.throws(() => validateRubric({ ...mockRubric, language: '' }),   /language/i);
+    assert.doesNotThrow(() => validateRubric({ ...mockRubric, language: 'es' }));
+  });
+
+  it('throws when "feedbackLanguage" is present but not a non-empty string', () => {
+    assert.throws(() => validateRubric({ ...mockRubric, feedbackLanguage: null }),  /feedbackLanguage/i);
+    assert.throws(() => validateRubric({ ...mockRubric, feedbackLanguage: '   ' }), /feedbackLanguage/i);
+    assert.doesNotThrow(() => validateRubric({ ...mockRubric, feedbackLanguage: 'en' }));
+  });
+
+  it('accepts rubrics without language / feedbackLanguage fields', () => {
+    const { language: _l, feedbackLanguage: _f, ...minimalRubric } = mockRubric;
+    assert.doesNotThrow(() => validateRubric(minimalRubric));
+  });
+
   it('throws when a criterion is missing its id', () => {
     const bad = { ...mockRubric, criteria: [{ ...mockRubric.criteria[0], id: '' }, mockRubric.criteria[1]] };
     assert.throws(() => validateRubric(bad), /missing.*id/i);
@@ -333,6 +350,23 @@ describe('validateRubric', () => {
   it('throws when a gradingScale entry has a missing label', () => {
     const bad = { ...mockRubric, gradingScale: [{ min: 0, max: 10, label: '' }] };
     assert.throws(() => validateRubric(bad), /label/i);
+  });
+
+  // ── gradingScale coverage ───────────────────────────────────────────────────
+
+  it('throws when gradingScale does not cover 0.0', () => {
+    const bad = { ...mockRubric, gradingScale: [{ min: 1.0, max: 10.0, label: 'Pass' }] };
+    assert.throws(() => validateRubric(bad), /cover 0\.0/i);
+  });
+
+  it('throws when gradingScale does not cover 10.0', () => {
+    const bad = { ...mockRubric, gradingScale: [{ min: 0.0, max: 9.0, label: 'Fail' }] };
+    assert.throws(() => validateRubric(bad), /cover 10\.0/i);
+  });
+
+  it('accepts a gradingScale that exactly covers 0.0 to 10.0', () => {
+    const good = { ...mockRubric, gradingScale: [{ min: 0, max: 10, label: 'Any' }] };
+    assert.doesNotThrow(() => validateRubric(good));
   });
 
 });
