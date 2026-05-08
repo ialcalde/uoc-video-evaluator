@@ -19,12 +19,12 @@ export function csvField(value) {
  */
 export async function writeCsv(outputDir, results, rubric) {
   const criteriaIds = rubric.criteria.map(c => c.id);
-  const header = ['student', 'score', 'grade', 'status', ...criteriaIds, 'overallFeedback', 'error'].join(',');
+  const header = ['student', 'score', 'grade', 'status', 'evaluatedAt', ...criteriaIds, 'overallFeedback', 'error'].join(',');
 
   const rows = results.map(r => {
     if (r.status === 'error') {
       return [
-        csvField(r.student), '', '', 'error',
+        csvField(r.student), '', '', 'error', '',
         ...criteriaIds.map(() => ''),
         '',
         csvField(r.error),
@@ -39,6 +39,7 @@ export async function writeCsv(outputDir, results, rubric) {
       r.evaluation.weightedScore,
       csvField(r.evaluation.grade),
       'ok',
+      csvField(r.evaluation.evaluatedAt ?? ''),
       ...criteriaIds.map(id => scoreMap[id] ?? ''),
       csvField(r.evaluation.overallFeedback ?? ''),
       '',

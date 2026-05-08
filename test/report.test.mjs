@@ -183,8 +183,9 @@ describe('report', () => {
     const raw   = await readFile(csvPath, 'utf8');
     const lines = raw.split('\n');
 
-    // Header: student,score,grade,status,content_accuracy,oral_expression,overallFeedback,error
+    // Header: student,score,grade,status,evaluatedAt,content_accuracy,oral_expression,overallFeedback,error
     assert.ok(lines[0].startsWith('student,score,grade,status'));
+    assert.ok(lines[0].includes('evaluatedAt'),     'header should include evaluatedAt column');
     assert.ok(lines[0].includes('content_accuracy'));
     assert.ok(lines[0].includes('oral_expression'));
     assert.ok(lines[0].includes('overallFeedback'), 'header should include overallFeedback column');
@@ -193,6 +194,14 @@ describe('report', () => {
     assert.ok(lines[1].includes('maria_lopez'));
     assert.ok(lines[1].includes(String(validEvaluation.weightedScore)));
     assert.ok(lines[1].includes('ok'));
+  });
+
+  it('writeCsv: ok rows include evaluatedAt from the evaluation object', async () => {
+    const results = [{ student: 'ts_student', status: 'ok', evaluation: validEvaluation }];
+    const csvPath = await writeCsv(tmpBase, results, mockRubric);
+    const raw = await readFile(csvPath, 'utf8');
+    assert.ok(raw.includes(validEvaluation.evaluatedAt),
+      'evaluatedAt should appear in the data row');
   });
 
   it('writeCsv: ok rows include the overallFeedback text', async () => {
