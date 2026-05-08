@@ -5,7 +5,27 @@ import { readFile } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { Readable } from 'stream';
-import { listVideos, downloadVideo, createDriveClient, authorise } from '../src/drive.mjs';
+import { EventEmitter } from 'events';
+import { createServer } from 'http';
+import { listVideos, downloadVideo, createDriveClient, authorise, waitForAuthCode } from '../src/drive.mjs';
+
+// Ask the OS for a free TCP port, then release it for our server to use.
+function getFreePort() {
+  return new Promise((resolve, reject) => {
+    const srv = createServer();
+    srv.listen(0, () => { const { port } = srv.address(); srv.close(() => resolve(port)); });
+    srv.on('error', reject);
+  });
+}
+
+// Build a minimal fake OAuth2 client for testing the first-time auth flow.
+function makeFakeOAuth2({ tokens = { access_token: 'tok', refresh_token: 'ref' } } = {}) {
+  const client = new EventEmitter();
+  client.setCredentials = () => {};
+  client.generateAuthUrl = () => 'https://accounts.google.com/o/oauth2/auth?fake=1';
+  client.getToken = async () => ({ tokens });
+  return client;
+}
 
 // Build a minimal mock google.drive client.
 function makeDrive({ files = [], streamChunks = [Buffer.from('data')] } = {}) {
@@ -259,6 +279,77 @@ describe('drive', () => {
       else process.env.GOOGLE_CLIENT_ID     = savedId;
       if (savedSecret === undefined) delete process.env.GOOGLE_CLIENT_SECRET;
       else process.env.GOOGLE_CLIENT_SECRET = savedSecret;
+    }
+  });
+
+  it('authorise: first-time flow writes token file and returns the oauth2 client', async () => {
+    const tokenBase = mkdtempSync(join(tmpdir(), 'uoc-drive-firsttime-'));
+    const tokenPath = join(tokenBase, 'new-token.json');   // does NOT exist yet
+    const fakeTokens = { access_token: 'new-access', refresh_token: 'new-refresh', expiry_date: 9e12 };
+    const fakeOAuth2 = makeFakeOAuth2({ tokens: fakeTokens });
+
+    const logged = [];
+
+    try {
+      const result = await authorise(
+        { info: msg => logged.push(msg), ok: msg => logged.push(msg) },
+        {
+          tokenPath,
+          waitForCodeFn: async () => 'test-auth-code',
+          // No openBrowserFn — exercises the real openBrowser() which calls exec()
+          // (xdg-open will fail but errors are intentionally ignored)
+          _oAuth2: fakeOAuth2,
+        }
+      );
+
+      assert.ok(result === fakeOAuth2, 'should return the injected oauth2 client');
+      assert.ok(logged.some(m => m.includes('google.com')), 'should log the auth URL');
+      assert.ok(existsSync(tokenPath), 'token file should be written after first-time auth');
+
+      const written = JSON.parse(await readFile(tokenPath, 'utf8'));
+      assert.equal(written.access_token,  fakeTokens.access_token,  'written token should match');
+      assert.equal(written.refresh_token, fakeTokens.refresh_token, 'refresh token should be written');
+      assert.ok(logged.some(m => m.includes('Token saved')), 'should log token-saved message');
+    } finally {
+      rmSync(tokenBase, { recursive: true, force: true });
+    }
+  });
+
+  // ── waitForAuthCode ─────────────────────────────────────────────────────────
+
+  it('waitForAuthCode: resolves with the code query parameter', async () => {
+    const port = await getFreePort();
+    const codePromise = waitForAuthCode(port);
+    await new Promise(r => setTimeout(r, 20));   // let the server bind
+
+    await fetch(`http://localhost:${port}?code=my-auth-code`);
+    assert.equal(await codePromise, 'my-auth-code');
+  });
+
+  it('waitForAuthCode: rejects with OAuth2 denial message on error query parameter', async () => {
+    const port = await getFreePort();
+    const waitPromise = waitForAuthCode(port);
+    await new Promise(r => setTimeout(r, 20));
+
+    // Attach the assertion handler BEFORE triggering the rejection, so Node.js
+    // never sees an unhandled promise rejection.
+    const assertion = assert.rejects(() => waitPromise, /access_denied/);
+    await fetch(`http://localhost:${port}?error=access_denied`).catch(() => {});
+    await assertion;
+  });
+
+  it('waitForAuthCode: rejects with EADDRINUSE when port is already occupied', async () => {
+    const port = await getFreePort();
+    const blocker = createServer();
+    await new Promise((res, rej) => { blocker.listen(port, res); blocker.on('error', rej); });
+
+    try {
+      await assert.rejects(
+        () => waitForAuthCode(port),
+        /already in use/
+      );
+    } finally {
+      await new Promise(res => blocker.close(res));
     }
   });
 

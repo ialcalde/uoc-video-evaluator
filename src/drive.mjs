@@ -59,11 +59,12 @@ function createOAuth2Client() {
  * Wait for the OAuth2 callback on a temporary local HTTP server.
  * Returns the authorization code sent by Google.
  */
-function waitForAuthCode() {
+// Exported for testing (port is injectable to avoid real port 8080 in tests).
+export function waitForAuthCode(port = OAUTH_PORT) {
   return new Promise((resolve, reject) => {
     const server = createServer((req, res) => {
       try {
-        const params = new URL(req.url, REDIRECT_URI).searchParams;
+        const params = new URL(req.url, `http://localhost:${port}`).searchParams;
         const code  = params.get('code');
         const error = params.get('error');
 
@@ -90,14 +91,14 @@ function waitForAuthCode() {
       }
     });
 
-    server.listen(OAUTH_PORT, () => {
+    server.listen(port, () => {
       // no-op: URL already printed before this call
     });
 
     server.on('error', err => {
       if (err.code === 'EADDRINUSE') {
         reject(new Error(
-          `Port ${OAUTH_PORT} is already in use. ` +
+          `Port ${port} is already in use. ` +
           'Stop the process using it and try again.'
         ));
       } else {
@@ -123,11 +124,19 @@ function openBrowser(url) {
  * Loads saved token or runs the interactive auth flow.
  *
  * @param {object}  log
- * @param {object}  [opts]
- * @param {string}  [opts.tokenPath]  Override token file path (default: TOKEN_PATH). Used in tests.
+ * @param {object}   [opts]
+ * @param {string}   [opts.tokenPath]      Override token file path (default: TOKEN_PATH). Used in tests.
+ * @param {Function} [opts.waitForCodeFn]  Override waitForAuthCode (default). Used in tests.
+ * @param {Function} [opts.openBrowserFn]  Override openBrowser (default). Used in tests.
+ * @param {object}   [opts._oAuth2]        Inject a pre-built OAuth2 client (skips createOAuth2Client). Tests only.
  */
-export async function authorise(log, { tokenPath = TOKEN_PATH } = {}) {
-  const oAuth2 = createOAuth2Client();
+export async function authorise(log, {
+  tokenPath     = TOKEN_PATH,
+  waitForCodeFn = waitForAuthCode,
+  openBrowserFn = openBrowser,
+  _oAuth2       = null,
+} = {}) {
+  const oAuth2 = _oAuth2 ?? createOAuth2Client();
 
   // ── Reuse saved token ─────────────────────────────────────────────────────
   if (existsSync(tokenPath)) {
@@ -156,9 +165,9 @@ export async function authorise(log, { tokenPath = TOKEN_PATH } = {}) {
   log.info(`\n  ${authUrl}\n`);
   log.info(`[Drive] Waiting for callback on http://localhost:${OAUTH_PORT} …`);
 
-  openBrowser(authUrl);
+  openBrowserFn(authUrl);
 
-  const code = await waitForAuthCode();
+  const code = await waitForCodeFn();
   const { tokens } = await oAuth2.getToken(code);
   oAuth2.setCredentials(tokens);
   await writeFile(tokenPath, JSON.stringify(tokens, null, 2), 'utf8');
