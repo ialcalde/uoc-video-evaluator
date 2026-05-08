@@ -134,6 +134,12 @@ export function validateRubric(rubric) {
     if (!c.id || typeof c.id !== 'string') {
       throw new Error(`${ctx}: missing or non-string "id"`);
     }
+    if (!/^[A-Za-z0-9_-]+$/.test(c.id)) {
+      throw new Error(
+        `${ctx}: "id" must contain only letters, digits, underscores, or hyphens. ` +
+        `Got: "${c.id}"`
+      );
+    }
     if (typeof c.name !== 'string' || !c.name.trim()) {
       throw new Error(`${ctx} ("${c.id}"): "name" must be a non-empty string`);
     }

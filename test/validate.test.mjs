@@ -333,6 +333,22 @@ describe('validateRubric', () => {
     assert.throws(() => validateRubric(bad), /missing.*id/i);
   });
 
+  it('throws when a criterion id contains characters that would break the CSV header', () => {
+    for (const badId of ['has space', 'has,comma', 'has"quote', 'has/slash']) {
+      const bad = { ...mockRubric, criteria: [{ ...mockRubric.criteria[0], id: badId }, mockRubric.criteria[1]] };
+      assert.throws(
+        () => validateRubric(bad),
+        /letters.*digits.*underscores.*hyphens/i,
+        `should reject id "${badId}"`
+      );
+    }
+  });
+
+  it('accepts criterion ids with letters, digits, underscores, and hyphens', () => {
+    const good = { ...mockRubric, criteria: [{ ...mockRubric.criteria[0], id: 'valid-id_123' }, mockRubric.criteria[1]] };
+    assert.doesNotThrow(() => validateRubric(good));
+  });
+
   it('throws when a criterion is missing its name', () => {
     const bad = { ...mockRubric, criteria: [{ ...mockRubric.criteria[0], name: '' }, mockRubric.criteria[1]] };
     assert.throws(() => validateRubric(bad), /"name"/i);

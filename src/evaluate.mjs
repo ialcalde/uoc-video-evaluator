@@ -94,7 +94,7 @@ export async function evaluate(transcript, rubric, anthropic, { model = 'claude-
 
   const callParams = {
     model,
-    max_tokens: thinking ? 8000 : 2048,
+    max_tokens: thinking ? 8000 : 4096,
     system:     systemConfig,
     ...(thinking ? { thinking: { type: 'adaptive' } } : {}),
   };
