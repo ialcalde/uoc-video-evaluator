@@ -63,7 +63,11 @@ export async function processVideo({
     const transcriptLang = rubric.language      || 'ca';
     const feedbackLang   = rubric.feedbackLanguage || 'ca';
     log.info(`[${student}] Transcribing (Whisper, lang=${transcriptLang})…`);
-    const transcript = await transcribeFn(audioPath, openai, { language: transcriptLang });
+    const transcript = await transcribeFn(audioPath, openai, {
+      language: transcriptLang,
+      onRetry: ({ attempt, maxRetries, status }) =>
+        log.warn?.(`[${student}] Whisper HTTP ${status} — retry ${attempt}/${maxRetries}`),
+    });
 
     if (!transcript.text?.trim()) {
       throw new Error('Transcription is empty — does the video have audio?');
