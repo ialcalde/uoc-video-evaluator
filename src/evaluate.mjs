@@ -1,11 +1,57 @@
 import { validateEvaluation } from './validate.mjs';
 import { withRetry } from './retry.mjs';
 
+// Structural labels used in the rubric block and correction retry message,
+// keyed by BCP-47 language code. Falls back to English for unknown codes.
+const PROMPT_I18N = {
+  ca: {
+    rubric:        'Rúbrica',
+    gradingScale:  'Escala de qualificació',
+    scoringLevels: 'Nivells de puntuació',
+    weight:        'pes',
+    maxPts:        'màx 10 pts',
+    evaluate:      'Avalua la transcripció contra cada criteri de la rúbrica.',
+    perCriterion:  'Per cada criteri proporciona:',
+    thenCompute:   'Després calcula:',
+    returnJson:    'Retorna exactament aquest format JSON:',
+    fixJson:       (msg) => `El JSON retornat no és vàlid: ${msg}\nSi us plau, retorna el JSON corregit seguint exactament l'esquema indicat. Sense text addicional, sense blocs markdown.`,
+    transcript:    'Transcripció',
+    systemPrompt:  (lang) => `Ets un avaluador acadèmic expert de la Universitat Oberta de Catalunya (UOC).\nAvalues presentacions de vídeo d'estudiants amb la rúbrica proporcionada.\nIMPORTANT: All justifications and the overallFeedback field MUST be written in the language with BCP-47 code "${lang}".\nRetorna ÚNICAMENT un objecte JSON vàlid — sense blocs markdown, sense text addicional.`,
+  },
+  es: {
+    rubric:        'Rúbrica',
+    gradingScale:  'Escala de calificación',
+    scoringLevels: 'Niveles de puntuación',
+    weight:        'peso',
+    maxPts:        'máx 10 pts',
+    evaluate:      'Evalúa la transcripción contra cada criterio de la rúbrica.',
+    perCriterion:  'Por cada criterio proporciona:',
+    thenCompute:   'Después calcula:',
+    returnJson:    'Devuelve exactamente este formato JSON:',
+    fixJson:       (msg) => `El JSON devuelto no es válido: ${msg}\nPor favor, devuelve el JSON corregido siguiendo exactamente el esquema indicado. Sin texto adicional, sin bloques markdown.`,
+    transcript:    'Transcripción',
+    systemPrompt:  (lang) => `Eres un evaluador académico experto de la Universitat Oberta de Catalunya (UOC).\nEvalúas presentaciones de vídeo de estudiantes con la rúbrica proporcionada.\nIMPORTANT: All justifications and the overallFeedback field MUST be written in the language with BCP-47 code "${lang}".\nDevuelve ÚNICAMENTE un objeto JSON válido — sin bloques markdown, sin texto adicional.`,
+  },
+  en: {
+    rubric:        'Rubric',
+    gradingScale:  'Grading scale',
+    scoringLevels: 'Scoring levels',
+    weight:        'weight',
+    maxPts:        'max 10 pts',
+    evaluate:      'Evaluate the transcript against each rubric criterion.',
+    perCriterion:  'For each criterion provide:',
+    thenCompute:   'Then compute:',
+    returnJson:    'Return exactly this JSON format:',
+    fixJson:       (msg) => `The returned JSON is invalid: ${msg}\nPlease return the corrected JSON following the schema exactly. No extra text, no markdown blocks.`,
+    transcript:    'Transcript',
+    systemPrompt:  (lang) => `You are an expert academic evaluator at the Universitat Oberta de Catalunya (UOC).\nYou evaluate student video presentations against the provided rubric.\nIMPORTANT: All justifications and the overallFeedback field MUST be written in the language with BCP-47 code "${lang}".\nReturn ONLY a valid JSON object — no markdown blocks, no additional text.`,
+  },
+};
+
+function t(lang) { return PROMPT_I18N[lang] ?? PROMPT_I18N.en; }
+
 function buildSystemPrompt(lang) {
-  return `Ets un avaluador acadèmic expert de la Universitat Oberta de Catalunya (UOC).
-Avalues presentacions de vídeo d'estudiants amb la rúbrica proporcionada.
-IMPORTANT: All justifications and the overallFeedback field MUST be written in the language with BCP-47 code "${lang}".
-Retorna ÚNICAMENT un objecte JSON vàlid — sense blocs markdown, sense text addicional.`;
+  return t(lang).systemPrompt(lang);
 }
 
 /**
@@ -13,43 +59,44 @@ Retorna ÚNICAMENT un objecte JSON vàlid — sense blocs markdown, sense text a
  * Identical across all students in a batch run — eligible for prompt caching.
  */
 function buildRubricBlock(rubric, lang) {
+  const labels = t(lang);
 
   const criteriaBlock = rubric.criteria.map(c =>
-    `### ${c.id} — ${c.nameEn} (pes: ${c.weight}, màx 10 pts)\n` +
+    `### ${c.id} — ${c.nameEn} (${labels.weight}: ${c.weight}, ${labels.maxPts})\n` +
     `${c.description}\n` +
-    `Nivells de puntuació:\n` +
+    `${labels.scoringLevels}:\n` +
     c.levels.map(l => `  - ${l.score}/10 (${l.label}): ${l.description}`).join('\n')
   ).join('\n\n');
 
-  return `# Rúbrica: ${rubric.title}
+  return `# ${labels.rubric}: ${rubric.title}
 
 ${criteriaBlock}
 
 ---
 
-# Escala de qualificació
+# ${labels.gradingScale}
 ${rubric.gradingScale.map(g => `${g.min}–${g.max}: ${g.label}`).join('\n')}
 
 ---
 
-Avalua la transcripció contra cada criteri de la rúbrica.
-Per cada criteri proporciona:
-- score: número 0–10
+${labels.evaluate}
+${labels.perCriterion}
+- score: number 0–10
 - justification: 2–4 sentences in "${lang}" with specific evidence from the transcript
 
-Després calcula:
-- weightedScore: suma de (score × weight) per a tots els criteris, arrodonit a 2 decimals
-- grade: etiqueta corresponent de l'escala de qualificació
+${labels.thenCompute}
+- weightedScore: sum of (score × weight) for all criteria, rounded to 2 decimals
+- grade: corresponding label from the grading scale
 
-Retorna exactament aquest format JSON:
+${labels.returnJson}
 {
   "rubricTitle": "<string>",
   "evaluatedAt": "<ISO 8601>",
   "language": "${lang}",
   "criteria": [
     {
-      "id": "<id del criteri>",
-      "name": "<nom en anglès>",
+      "id": "<criterion id>",
+      "name": "<English criterion name>",
       "weight": <number>,
       "score": <number 0-10>,
       "justification": "<text in ${lang}>"
@@ -65,8 +112,9 @@ Retorna exactament aquest format JSON:
  * Build the per-student transcript block. Changes every call — not cached.
  */
 function buildTranscriptBlock(transcript, rubric) {
-  const lang = rubric.language || rubric.feedbackLanguage || 'ca';
-  return `# Transcripció (idioma: ${lang})\n${transcript.text}`;
+  const lang   = rubric.language || rubric.feedbackLanguage || 'ca';
+  const label  = t(lang).transcript;
+  return `# ${label} (lang: ${lang})\n${transcript.text}`;
 }
 
 /**
@@ -94,7 +142,7 @@ export async function evaluate(transcript, rubric, anthropic, { model = 'claude-
 
   const callParams = {
     model,
-    max_tokens: thinking ? 8000 : 4096,
+    max_tokens: thinking ? 16000 : 4096,
     system:     systemConfig,
     ...(thinking ? { thinking: { type: 'adaptive' } } : {}),
   };
@@ -130,10 +178,7 @@ export async function evaluate(transcript, rubric, anthropic, { model = 'claude-
           { role: 'assistant', content: rawFirst    },
           {
             role: 'user',
-            content:
-              `El JSON retornat no és vàlid: ${firstError.message}\n` +
-              `Si us plau, retorna el JSON corregit seguint exactament l'esquema indicat. ` +
-              `Sense text addicional, sense blocs markdown.`,
+            content: t(lang).fixJson(firstError.message),
           },
         ],
       }).finalMessage(),
