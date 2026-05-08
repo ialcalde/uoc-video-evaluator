@@ -43,11 +43,12 @@ describe('processVideo', () => {
 
   // ── skipExisting ─────────────────────────────────────────────────────────────
 
-  it('returns cached evaluation when skipExisting=true and evaluation.json exists', async () => {
+  it('returns cached evaluation when skipExisting=true and both output files exist', async () => {
     const student    = 'cached_student';
     const studentDir = join(outDir, student);
     mkdirSync(studentDir, { recursive: true });
     writeFileSync(join(studentDir, 'evaluation.json'), JSON.stringify(validEvaluation), 'utf8');
+    writeFileSync(join(studentDir, 'feedback_ca.txt'), 'cached feedback', 'utf8');
 
     let transcribeCalled = false;
     const trackingTranscribe = async () => { transcribeCalled = true; return { text: 'x', segments: [] }; };
@@ -409,6 +410,7 @@ describe('processVideo', () => {
     const studentDir2 = join(outDir, student);
     mkdirSync(studentDir2, { recursive: true });
     writeFileSync(join(studentDir2, 'evaluation.json'), JSON.stringify(validEvaluation), 'utf8');
+    writeFileSync(join(studentDir2, 'feedback_ca.txt'), 'cached feedback', 'utf8');
 
     const result = await processVideo({
       videoPath:      '/fake/video.mp4',
