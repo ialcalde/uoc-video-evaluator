@@ -205,6 +205,17 @@ describe('parseArgs', () => {
     assert.deepEqual(unknown, [], 'non-flag tokens are not treated as unknown flags');
   });
 
+  it('calls onUnknown with a "requires a value" message when a value-flag has no argument', () => {
+    for (const flag of ['--drive-folder', '--model', '--concurrency', '--output-dir']) {
+      const msgs = [];
+      parseArgs(argv(flag), msg => msgs.push(msg));   // flag is the last token — no value follows
+      assert.ok(
+        msgs.some(m => m.includes(flag) && m.includes('requires a value')),
+        `${flag} without value should produce "requires a value" message, got: ${JSON.stringify(msgs)}`
+      );
+    }
+  });
+
   it('warns once per unknown flag when multiple unrecognised flags are passed', () => {
     const unknown = [];
     parseArgs(argv('--bad-one', '--bad-two'), flag => unknown.push(flag));

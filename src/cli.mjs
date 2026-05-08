@@ -61,6 +61,10 @@ export function parseArgs(argv, onUnknown = flag => console.warn(`[WARN]  Unknow
   const args = argv.slice(2);
   const opts = {};
 
+  // Flags that require a following value — used to give a better error than "unknown flag"
+  // when the user forgets to supply the value (e.g. `--model` at end of argv).
+  const REQUIRES_VALUE = new Set(['--drive-folder', '--model', '--concurrency', '--output-dir']);
+
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--drive-folder' && args[i + 1]) {
       opts.driveFolderId = args[++i];
@@ -82,6 +86,8 @@ export function parseArgs(argv, onUnknown = flag => console.warn(`[WARN]  Unknow
       opts.thinking = true;
     } else if (args[i] === '--help' || args[i] === '-h') {
       opts.help = true;
+    } else if (REQUIRES_VALUE.has(args[i])) {
+      onUnknown(`${args[i]} requires a value`);
     } else if (args[i].startsWith('-')) {
       onUnknown(args[i]);
     }
