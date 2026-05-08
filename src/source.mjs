@@ -3,7 +3,7 @@ import { unlink } from 'fs/promises';
 import { basename, extname, join } from 'path';
 import { listVideos, downloadVideo } from './drive.mjs';
 
-export const VIDEO_EXTS = new Set(['.mp4', '.mov', '.mkv', '.avi', '.webm']);
+export const VIDEO_EXTS = new Set(['.mp4', '.mov', '.mkv', '.avi', '.webm', '.wmv']);
 
 /**
  * Collect all video files from a local directory.

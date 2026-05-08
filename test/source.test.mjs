@@ -23,7 +23,7 @@ describe('collectLocalVideos', () => {
     });
   });
 
-  it('discovers all five supported video extensions', () => {
+  it('discovers all supported video extensions', () => {
     withDir(dir => {
       for (const ext of VIDEO_EXTS) {
         writeFileSync(join(dir, `student${ext}`), '');
@@ -90,7 +90,7 @@ describe('collectLocalVideos', () => {
   });
 
   it('VIDEO_EXTS contains the expected formats', () => {
-    for (const ext of ['.mp4', '.mov', '.mkv', '.avi', '.webm']) {
+    for (const ext of ['.mp4', '.mov', '.mkv', '.avi', '.webm', '.wmv']) {
       assert.ok(VIDEO_EXTS.has(ext), `expected ${ext} to be in VIDEO_EXTS`);
     }
   });

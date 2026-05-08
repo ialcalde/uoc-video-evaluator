@@ -37,7 +37,7 @@ export async function processVideo({
   rubric,
   outputDir,
   tmpDir,
-  model           = 'claude-sonnet-4-6',
+  model           = 'claude-opus-4-7',
   thinking        = false,
   skipExisting    = false,
   log             = { info: () => {}, ok: () => {} },
