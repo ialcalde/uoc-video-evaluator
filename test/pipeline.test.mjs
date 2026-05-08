@@ -201,6 +201,35 @@ describe('processVideo', () => {
     );
   });
 
+  it('propagates error and cleans up temp audio when extractAudio throws', async () => {
+    const student = 'extract_fail_student';
+    let capturedAudioPath;
+
+    const extractWithPartialFile = async (_src, audioPath) => {
+      capturedAudioPath = audioPath;
+      writeFileSync(audioPath, Buffer.alloc(8));   // write a partial file before throwing
+      throw new Error('ffmpeg not found');
+    };
+
+    await assert.rejects(
+      () => processVideo({
+        videoPath:      '/fake/video.mp4',
+        student,
+        anthropic:      makeAnthropic(),
+        openai:         {},
+        rubric:         mockRubric,
+        outputDir:      outDir,
+        tmpDir,
+        log:            noop,
+        extractAudioFn: extractWithPartialFile,
+        transcribeFn:   makeTranscribe(),
+      }),
+      /ffmpeg not found/
+    );
+
+    assert.ok(!existsSync(capturedAudioPath), 'partial audio file should be deleted after extract error');
+  });
+
   it('cleans up the temp audio file when transcription fails', async () => {
     const student = 'cleanup_student';
     let capturedAudioPath;
