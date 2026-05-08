@@ -249,9 +249,10 @@ describe('report', () => {
       const dir = ensureStudentDir(rebuildBase, 'anna');
       await writeEvaluation(dir, validEvaluation);
 
-      const csvPath = await rebuildCsv(rebuildBase, mockRubric);
+      const { csvPath, count } = await rebuildCsv(rebuildBase, mockRubric);
       const raw = await readFile(csvPath, 'utf8');
 
+      assert.equal(count, 1, 'should report 1 rebuilt evaluation');
       assert.ok(raw.includes('anna'));
       assert.ok(raw.includes(String(validEvaluation.weightedScore)));
     } finally {
@@ -267,10 +268,11 @@ describe('report', () => {
       await writeEvaluation(dirA, validEvaluation);
       ensureStudentDir(rebuildBase, 'bob');  // no evaluation.json
 
-      const csvPath = await rebuildCsv(rebuildBase, mockRubric);
+      const { csvPath, count } = await rebuildCsv(rebuildBase, mockRubric);
       const raw = await readFile(csvPath, 'utf8');
       const lines = raw.trim().split('\n');
 
+      assert.equal(count, 1, 'should count only dirs with evaluation.json');
       assert.equal(lines.length, 2, 'header + 1 data row');
       assert.ok(raw.includes('alice'));
       assert.ok(!raw.includes('bob'));
@@ -287,7 +289,7 @@ describe('report', () => {
         await writeEvaluation(d, validEvaluation);
       }
 
-      const csvPath = await rebuildCsv(rebuildBase, mockRubric);
+      const { csvPath } = await rebuildCsv(rebuildBase, mockRubric);
       const raw = await readFile(csvPath, 'utf8');
       const dataLines = raw.trim().split('\n').slice(1);  // skip header
 
@@ -299,12 +301,14 @@ describe('report', () => {
     }
   });
 
-  it('rebuildCsv: returns empty CSV when no evaluation.json files exist', async () => {
+  it('rebuildCsv: returns count=0 when no evaluation.json files exist', async () => {
     const rebuildBase = mkdtempSync(join(tmpdir(), 'uoc-rebuild-test-'));
     try {
-      const csvPath = await rebuildCsv(rebuildBase, mockRubric);
+      const { csvPath, count } = await rebuildCsv(rebuildBase, mockRubric);
       const raw = await readFile(csvPath, 'utf8');
       const lines = raw.trim().split('\n');
+
+      assert.equal(count, 0, 'count should be 0 for empty directory');
       assert.equal(lines.length, 1, 'only header row');
     } finally {
       rmSync(rebuildBase, { recursive: true, force: true });

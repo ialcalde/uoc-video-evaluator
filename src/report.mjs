@@ -108,7 +108,8 @@ export async function rebuildCsv(outputDir, rubric) {
   }
 
   results.sort((a, b) => a.student.localeCompare(b.student));
-  return writeCsv(outputDir, results, rubric);
+  const csvPath = await writeCsv(outputDir, results, rubric);
+  return { csvPath, count: results.length };
 }
 
 const I18N = {

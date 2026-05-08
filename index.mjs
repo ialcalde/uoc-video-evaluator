@@ -102,8 +102,8 @@ async function main() {
   // ── Rebuild CSV from existing evaluation.json files ────────────────────────
   if (doRebuild) {
     log.info(`[REBUILD] Scanning ${OUT_DIR} for evaluation.json files…`);
-    const csvPath = await rebuildCsv(OUT_DIR, rubric);
-    log.ok(`[REBUILD] CSV written → ${csvPath}`);
+    const { csvPath, count } = await rebuildCsv(OUT_DIR, rubric);
+    log.ok(`[REBUILD] ${count} evaluation(s) → ${csvPath}`);
     process.exit(0);
   }
 
