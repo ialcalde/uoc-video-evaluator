@@ -234,6 +234,18 @@ describe('validateEvaluation', () => {
     );
   });
 
+  // ── criteria ordering ───────────────────────────────────────────────────────
+
+  it('normalises criteria order to match rubric order', () => {
+    // Reverse the order that Claude returned
+    const ev = { ...validEvaluation, criteria: [...validEvaluation.criteria].reverse() };
+    const result = validateEvaluation(toRaw(ev), mockRubric);
+    assert.equal(result.criteria[0].id, mockRubric.criteria[0].id,
+      'first criterion should match rubric order');
+    assert.equal(result.criteria[1].id, mockRubric.criteria[1].id,
+      'second criterion should match rubric order');
+  });
+
   // ── weightedScore and grade are recomputed ──────────────────────────────────
 
   it('recomputes weightedScore from criterion scores regardless of Claude value', () => {
