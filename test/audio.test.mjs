@@ -13,7 +13,24 @@ import { execSync } from 'child_process';
 import { writeFileSync, mkdtempSync, rmSync, statSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
+import { EventEmitter } from 'events';
 import { extractAudio, MAX_AUDIO_BYTES } from '../src/audio.mjs';
+
+// Build a fake child process whose stderr emits optional data, then
+// emits 'close' with the given code — or emits 'error' if provided.
+function makeFakeProc({ stderrChunks = [], closeCode = 0, spawnError = null } = {}) {
+  const proc = new EventEmitter();
+  proc.stderr = new EventEmitter();
+  setImmediate(() => {
+    if (spawnError) {
+      proc.emit('error', spawnError);
+    } else {
+      for (const chunk of stderrChunks) proc.stderr.emit('data', Buffer.from(chunk));
+      proc.emit('close', closeCode);
+    }
+  });
+  return proc;
+}
 
 // Detect ffmpeg once for the whole suite
 const FFMPEG_AVAILABLE = (() => {
@@ -160,5 +177,52 @@ describe('extractAudio', () => {
 
   it('MAX_AUDIO_BYTES is exported and equals 24 MB', () => {
     assert.equal(MAX_AUDIO_BYTES, 24 * 1024 * 1024);
+  });
+
+  // ── spawnFn injection: exercises runFfmpeg internals without a real ffmpeg ──
+
+  it('runFfmpeg resolves with audioPath when the mock process exits with code 0', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'uoc-audio-test-'));
+    try {
+      const audioPath = join(tmp, 'audio.mp3');
+      writeFileSync(audioPath, Buffer.alloc(1024));   // statSync needs a file to exist
+      const result = await extractAudio('/fake.mp4', audioPath, {
+        spawnFn: () => makeFakeProc({ closeCode: 0 }),
+      });
+      assert.equal(result, audioPath);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it('runFfmpeg rejects with stderr snippet when mock process exits with non-zero code', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'uoc-audio-test-'));
+    try {
+      const audioPath = join(tmp, 'audio.mp3');
+      await assert.rejects(
+        () => extractAudio('/fake.mp4', audioPath, {
+          spawnFn: () => makeFakeProc({ stderrChunks: ['invalid codec\n'], closeCode: 1 }),
+        }),
+        /ffmpeg exited 1/
+      );
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it('runFfmpeg rejects with "ffmpeg not found" when spawn emits an error event', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'uoc-audio-test-'));
+    try {
+      const audioPath = join(tmp, 'audio.mp3');
+      const enoent = Object.assign(new Error('spawn ffmpeg ENOENT'), { code: 'ENOENT' });
+      await assert.rejects(
+        () => extractAudio('/fake.mp4', audioPath, {
+          spawnFn: () => makeFakeProc({ spawnError: enoent }),
+        }),
+        /ffmpeg not found/
+      );
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
   });
 });

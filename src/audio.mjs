@@ -8,9 +8,9 @@ export const MAX_AUDIO_BYTES = 24 * 1024 * 1024;   // 24 MB
  * Spawn ffmpeg with the given source, destination, and audio codec flags.
  * Resolves with audioPath on exit-code 0, rejects otherwise.
  */
-function runFfmpeg(videoPath, audioPath, audioFlags) {
+function runFfmpeg(videoPath, audioPath, audioFlags, spawnFn = spawn) {
   return new Promise((resolve, reject) => {
-    const proc = spawn('ffmpeg', [
+    const proc = spawnFn('ffmpeg', [
       '-y',
       '-i', videoPath,
       '-vn',            // drop video stream
@@ -47,19 +47,19 @@ function runFfmpeg(videoPath, audioPath, audioFlags) {
  * @param {Function} [opts.ffmpegFn]  Injected for testing (default: runFfmpeg).
  * @returns {Promise<string>} Resolves with audioPath on success.
  */
-export async function extractAudio(videoPath, audioPath, { ffmpegFn = runFfmpeg } = {}) {
-  await ffmpegFn(videoPath, audioPath, ['-c:a', 'libmp3lame', '-q:a', '4']);
+export async function extractAudio(videoPath, audioPath, { ffmpegFn = runFfmpeg, spawnFn = spawn } = {}) {
+  await ffmpegFn(videoPath, audioPath, ['-c:a', 'libmp3lame', '-q:a', '4'], spawnFn);
 
   let { size } = statSync(audioPath);
   if (size > MAX_AUDIO_BYTES) {
     // Pass 2: 32 kbps mono — ~14 MB for a 60-min recording
-    await ffmpegFn(videoPath, audioPath, ['-c:a', 'libmp3lame', '-b:a', '32k']);
+    await ffmpegFn(videoPath, audioPath, ['-c:a', 'libmp3lame', '-b:a', '32k'], spawnFn);
     ({ size } = statSync(audioPath));
   }
 
   if (size > MAX_AUDIO_BYTES) {
     // Pass 3: 16 kbps mono — ~7 MB for a 60-min recording; adequate for speech recognition
-    await ffmpegFn(videoPath, audioPath, ['-c:a', 'libmp3lame', '-b:a', '16k']);
+    await ffmpegFn(videoPath, audioPath, ['-c:a', 'libmp3lame', '-b:a', '16k'], spawnFn);
     ({ size } = statSync(audioPath));
   }
 

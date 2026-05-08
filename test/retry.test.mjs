@@ -110,6 +110,16 @@ describe('withRetry', () => {
     );
   });
 
+  it('applies positive jitter (Math.floor path) when baseDelay is greater than zero', async () => {
+    let calls = 0;
+    const result = await withRetry(
+      () => { calls++; if (calls < 2) throw apiError(429); return Promise.resolve('ok'); },
+      { baseDelay: 1, maxRetries: 1 }   // tiny delay; tests the true branch of baseDelay > 0 ternary
+    );
+    assert.equal(result, 'ok');
+    assert.equal(calls, 2);
+  });
+
   it('uses statusCode as fallback when status is absent', async () => {
     let calls = 0;
     const result = await withRetry(() => {
