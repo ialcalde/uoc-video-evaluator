@@ -173,6 +173,20 @@ describe('parseArgs', () => {
 
   // ── Unknown flags ─────────────────────────────────────────────────────────
 
+  it('uses console.warn default onUnknown when no handler is provided', () => {
+    // Call with an unknown flag and no custom onUnknown — exercises the default
+    // onUnknown = flag => console.warn(...) arrow function.
+    const orig = console.warn;
+    const warned = [];
+    console.warn = msg => warned.push(msg);
+    try {
+      parseArgs(argv('--unknown-flag-xyz'));
+    } finally {
+      console.warn = orig;
+    }
+    assert.ok(warned.some(m => m.includes('--unknown-flag-xyz')), 'default onUnknown should call console.warn');
+  });
+
   it('calls onUnknown for unrecognised flags starting with -', () => {
     const unknown = [];
     parseArgs(argv('--typo-flag'), flag => unknown.push(flag));

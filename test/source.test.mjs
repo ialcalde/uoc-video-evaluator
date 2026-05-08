@@ -251,4 +251,27 @@ describe('collectDriveVideos', () => {
     }
   });
 
+  it('works without a log option (default no-op log functions are used)', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'uoc-drive-src-'));
+    try {
+      // Omit log entirely — exercises all four default lambdas: info, warn, ok, sep.
+      // Pass one file so the full download path (info + ok + sep) is executed;
+      // the empty-folder warn branch is covered by calling with zero files in a second call.
+      const results = await collectDriveVideos('folder-id', {}, {
+        tmpDir: tmp,
+        listVideosFn: async () => [{ id: 'x', name: 'v.mp4', size: '100' }],
+        downloadVideoFn: noop,
+      });
+      assert.equal(results.length, 1);
+      // Also exercise the warn branch (no files) via the same default log
+      await collectDriveVideos('folder-id', {}, {
+        tmpDir: tmp,
+        listVideosFn: async () => [],
+        downloadVideoFn: noop,
+      });
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
 });

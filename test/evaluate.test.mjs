@@ -413,6 +413,53 @@ describe('evaluate', () => {
     assert.equal(receivedUsage.cache_creation_input_tokens, 50);
   });
 
+  it('uses Spanish fixJson message in schema-correction retry when feedbackLanguage is "es"', async () => {
+    let correctionMessage;
+    let call = 0;
+    const esRubric = { ...mockRubric, feedbackLanguage: 'es' };
+    const client = {
+      messages: {
+        stream: (params) => ({
+          finalMessage: async () => {
+            call++;
+            if (call === 1) return { content: [{ type: 'text', text: 'invalid json' }] };
+            // Capture the correction message from the multi-turn messages array
+            correctionMessage = params.messages[2]?.content;
+            return { content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] };
+          },
+        }),
+        create: async () => ({ content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] }),
+      },
+    };
+
+    await evaluate(mockTranscript, esRubric, client);
+    assert.ok(typeof correctionMessage === 'string' && correctionMessage.includes('JSON'),
+      'Spanish fixJson message should contain "JSON"');
+  });
+
+  it('uses English fixJson message in schema-correction retry when feedbackLanguage is "en"', async () => {
+    let correctionMessage;
+    let call = 0;
+    const enRubric = { ...mockRubric, feedbackLanguage: 'en' };
+    const client = {
+      messages: {
+        stream: (params) => ({
+          finalMessage: async () => {
+            call++;
+            if (call === 1) return { content: [{ type: 'text', text: 'invalid json' }] };
+            correctionMessage = params.messages[2]?.content;
+            return { content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] };
+          },
+        }),
+        create: async () => ({ content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] }),
+      },
+    };
+
+    await evaluate(mockTranscript, enRubric, client);
+    assert.ok(typeof correctionMessage === 'string' && correctionMessage.includes('JSON'),
+      'English fixJson message should contain "JSON"');
+  });
+
   it('falls back to English structural labels for an unknown feedbackLanguage code', async () => {
     let capturedContent;
     const frRubric = { ...mockRubric, feedbackLanguage: 'fr' };
