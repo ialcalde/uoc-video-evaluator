@@ -43,6 +43,7 @@ export async function processVideo({
   log             = { info: () => {}, ok: () => {} },
   extractAudioFn  = extractAudio,
   transcribeFn    = transcribe,
+  baseDelay,
 }) {
   const start          = Date.now();
   const audioPath      = join(tmpDir, `${student}_${start}.mp3`);
@@ -81,7 +82,7 @@ export async function processVideo({
     log.info(`[${student}] Evaluating with Claude…`);
     let tokenUsage;
     const evaluation = await evaluate(transcript, rubric, anthropic, {
-      model, thinking,
+      model, thinking, baseDelay,
       onUsage:  u => { tokenUsage = u; },
       onRetry: ({ attempt, maxRetries, status }) =>
         log.warn?.(`[${student}] Claude HTTP ${status} — retry ${attempt}/${maxRetries}`),

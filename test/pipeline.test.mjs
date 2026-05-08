@@ -442,6 +442,7 @@ describe('processVideo', () => {
       rubric:         mockRubric,
       outputDir:      outDir,
       tmpDir,
+      baseDelay:      0,
       log:            warnLog,
       extractAudioFn: noopExtract,
       transcribeFn:   makeTranscribe(),
