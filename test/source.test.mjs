@@ -208,6 +208,32 @@ describe('collectDriveVideos', () => {
     }
   });
 
+  it('logs progress message when download crosses the 10 MB threshold', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'uoc-drive-src-'));
+    const logged = [];
+    const progressLog = { ...noLog, info: msg => logged.push(msg) };
+    try {
+      await collectDriveVideos('folder-id', {}, {
+        tmpDir: tmp,
+        log: progressLog,
+        listVideosFn: async () => [{ id: 'x', name: 'big.mp4', size: '0' }],
+        downloadVideoFn: async (_id, _name, _dir, _drive, onProgress) => {
+          // Simulate progress: first call is below threshold, second crosses 10 MB
+          onProgress?.(5 * 1_048_576);    // 5 MB — below 10 MB threshold, no log
+          onProgress?.(11 * 1_048_576);   // 11 MB — above threshold, should log
+        },
+      });
+      assert.ok(
+        logged.some(m => m.includes('11 MB')),
+        'should emit a progress log line after crossing 10 MB'
+      );
+      const progressLines = logged.filter(m => m.includes('MB received'));
+      assert.equal(progressLines.length, 1, 'should log exactly once for a single 10 MB crossing');
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
   it('handles missing file.size gracefully (size shown as ?)', async () => {
     const tmp = mkdtempSync(join(tmpdir(), 'uoc-drive-src-'));
     const logged = [];
