@@ -91,9 +91,17 @@ export function validateEvaluation(raw, rubric) {
   const scaleEntry = rubric.gradingScale.find(
     g => parsed.weightedScore >= g.min && parsed.weightedScore <= g.max
   );
-  parsed.grade = scaleEntry
-    ? scaleEntry.label
-    : rubric.gradingScale[rubric.gradingScale.length - 1].label;
+  if (scaleEntry) {
+    parsed.grade = scaleEntry.label;
+  } else {
+    // Score falls in a narrow boundary gap (e.g. 4.95 between [0–4.9] and [5–6.9]).
+    // Assign the grade for the highest band whose floor is ≤ the score.
+    const byMinDesc = [...rubric.gradingScale].sort((a, b) => b.min - a.min);
+    const floor     = byMinDesc.find(g => g.min <= parsed.weightedScore);
+    parsed.grade    = floor
+      ? floor.label
+      : rubric.gradingScale[rubric.gradingScale.length - 1].label;
+  }
 
   return parsed;
 }

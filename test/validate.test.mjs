@@ -275,6 +275,47 @@ describe('validateEvaluation', () => {
     assert.equal(result.grade, 'Notable (B)');
   });
 
+  it('assigns the highest applicable floor grade when score falls in a scale gap', () => {
+    // Build a rubric whose scale has a 0.1 gap at 4.9–5.0
+    const gapRubric = {
+      ...mockRubric,
+      gradingScale: [
+        { min: 0.0, max: 4.9,  label: 'Suspès (D)'    },
+        { min: 5.0, max: 10.0, label: 'Aprovat o més'  },
+      ],
+    };
+    // weightedScore = 8*0.6 + 7*0.4 = 7.6 — well above 5.0 so no gap test needed here.
+    // To land in the gap we need a score between 4.9 and 5.0.
+    // Use scores (8, 5) with weights (0.6, 0.4): 0.6*8 + 0.4*5 = 4.8 + 2.0 = 6.8 — not in gap.
+    // Use scores (8, 3) with weights (0.6, 0.4): 4.8 + 1.2 = 6.0 — not in gap.
+    // Use a custom rubric where we can get 4.95 exactly.
+    // Easiest: override weightedScore via a rubric whose criteria produce 4.95.
+    // With weight 0.5 each and scores (5, 4) → 0.5*5 + 0.5*4 = 4.5 — not in gap.
+    // With weights (0.95, 0.05) and scores (5, 4) → 4.75 + 0.2 = 4.95 ✓
+    const narrowRubric = {
+      ...mockRubric,
+      criteria: [
+        { ...mockRubric.criteria[0], weight: 0.95 },
+        { ...mockRubric.criteria[1], weight: 0.05 },
+      ],
+      gradingScale: [
+        { min: 0.0, max: 4.9,  label: 'Fail' },
+        { min: 5.0, max: 10.0, label: 'Pass' },
+      ],
+    };
+    const ev = {
+      ...validEvaluation,
+      criteria: [
+        { ...validEvaluation.criteria[0], score: 5 },
+        { ...validEvaluation.criteria[1], score: 4 },
+      ],
+    };
+    // weightedScore = 0.95*5 + 0.05*4 = 4.75 + 0.2 = 4.95 — in the gap
+    const result = validateEvaluation(toRaw(ev), narrowRubric);
+    assert.equal(result.weightedScore, 4.95);
+    assert.equal(result.grade, 'Fail', 'score 4.95 falls below the 5.0 threshold → Fail');
+  });
+
   it('throws when a rubric criterion is absent from the evaluation', () => {
     const ev = { ...validEvaluation, criteria: [validEvaluation.criteria[0]] };  // only 1 of 2
     assert.throws(
