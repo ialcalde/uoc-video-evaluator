@@ -20,7 +20,6 @@ function makeAnthropic() {
   return {
     messages: {
       stream:  () => ({ finalMessage: async () => msg() }),
-      create:  async () => msg(),
     },
   };
 }
@@ -430,7 +429,6 @@ describe('processVideo', () => {
             return { content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] };
           },
         }),
-        create: async () => ({ content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] }),
       },
     };
 
@@ -490,7 +488,6 @@ describe('processVideo', () => {
             return { content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] };
           },
         }),
-        create: async () => ({ content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] }),
       },
     };
 
@@ -521,7 +518,6 @@ describe('processVideo', () => {
             return { content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] };
           },
         }),
-        create: async () => ({ content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] }),
       },
     };
 
@@ -555,7 +551,6 @@ describe('processVideo', () => {
             usage:   fakeUsage,
           }),
         }),
-        create: async () => ({ content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] }),
       },
     };
 
@@ -587,7 +582,6 @@ describe('processVideo', () => {
             usage:   fakeUsage,
           }),
         }),
-        create: async () => ({ content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] }),
       },
     };
 

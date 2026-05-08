@@ -195,7 +195,7 @@ describe('drive', () => {
   it('createDriveClient: returns an object with a files property', () => {
     // We can't call the real Google API in unit tests, but we can verify the
     // factory returns an object shaped like a Drive client.
-    const fakeAuth = { credentials: {}, request: async () => ({ data: {} }) };
+    const fakeAuth = { credentials: {} };
     const client   = createDriveClient(fakeAuth);
     assert.ok(client,               'should return a client object');
     assert.ok(client.files,         'client should have a files namespace');

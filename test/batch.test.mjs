@@ -18,7 +18,7 @@ describe('runBatch', () => {
   });
 
   it('returns an empty array for empty input', async () => {
-    const results = await runBatch([], async x => x, 3);
+    const results = await runBatch([], delay, 3);
     assert.deepEqual(results, []);
   });
 
