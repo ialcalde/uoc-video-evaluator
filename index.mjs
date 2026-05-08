@@ -107,6 +107,19 @@ async function main() {
     process.exit(0);
   }
 
+  // ── Required env vars (fail fast, before any expensive collection) ────────────
+  // Skip for --dry-run: listing videos doesn't require API keys.
+  if (!dryRun) {
+    const missingKeys = [];
+    if (!process.env.ANTHROPIC_API_KEY) missingKeys.push('ANTHROPIC_API_KEY');
+    if (!process.env.OPENAI_API_KEY)    missingKeys.push('OPENAI_API_KEY');
+    if (missingKeys.length > 0) {
+      log.error(`Missing environment variables: ${missingKeys.join(', ')}`);
+      log.error('Copy .env.example to .env and fill in your keys.');
+      process.exit(1);
+    }
+  }
+
   // ── Collect videos ──────────────────────────────────────────────────────────
   let entries;
 
@@ -136,20 +149,6 @@ async function main() {
     }
     log.info('[DRY RUN] No API calls made. Remove --dry-run to process.');
     process.exit(0);
-  }
-
-  // ── Required env vars ───────────────────────────────────────────────────────
-  const missingKeys = [];
-  if (!process.env.ANTHROPIC_API_KEY) missingKeys.push('ANTHROPIC_API_KEY');
-  if (!process.env.OPENAI_API_KEY)    missingKeys.push('OPENAI_API_KEY');
-  if (driveFolderId) {
-    if (!process.env.GOOGLE_CLIENT_ID)     missingKeys.push('GOOGLE_CLIENT_ID');
-    if (!process.env.GOOGLE_CLIENT_SECRET) missingKeys.push('GOOGLE_CLIENT_SECRET');
-  }
-  if (missingKeys.length) {
-    log.error(`Missing environment variables: ${missingKeys.join(', ')}`);
-    log.error('Copy .env.example to .env and fill in your keys.');
-    process.exit(1);
   }
 
   // ── Init API clients ────────────────────────────────────────────────────────
