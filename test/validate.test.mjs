@@ -171,6 +171,39 @@ describe('validateEvaluation', () => {
     );
   });
 
+  // ── criterion name ──────────────────────────────────────────────────────────
+
+  it('throws when a criterion name is missing', () => {
+    const ev = {
+      ...validEvaluation,
+      criteria: validEvaluation.criteria.map((c, i) => {
+        if (i !== 0) return c;
+        const { name: _, ...rest } = c;
+        return rest;
+      }),
+    };
+    assert.throws(() => validateEvaluation(toRaw(ev), mockRubric), /missing.*"name"/i);
+  });
+
+  it('throws when a criterion name is an empty string', () => {
+    const ev = {
+      ...validEvaluation,
+      criteria: validEvaluation.criteria.map((c, i) => i === 0 ? { ...c, name: '' } : c),
+    };
+    assert.throws(() => validateEvaluation(toRaw(ev), mockRubric), /"name"/i);
+  });
+
+  it('normalises criterion weights to rubric values', () => {
+    // Claude sent wrong weight (0.99) — validateEvaluation should overwrite with rubric value (0.6)
+    const ev = {
+      ...validEvaluation,
+      criteria: validEvaluation.criteria.map((c, i) => i === 0 ? { ...c, weight: 0.99 } : c),
+    };
+    const result = validateEvaluation(toRaw(ev), mockRubric);
+    assert.equal(result.criteria[0].weight, mockRubric.criteria[0].weight,
+      'weight should be normalised to rubric value');
+  });
+
   // ── Justification ───────────────────────────────────────────────────────────
 
   it('throws when justification is missing', () => {

@@ -58,6 +58,9 @@ export function validateEvaluation(raw, rubric) {
         `Criterion "${c.id}" has invalid score: ${JSON.stringify(c.score)} (must be number 0–10)`
       );
     }
+    if (typeof c.name !== 'string' || !c.name.trim()) {
+      throw new Error(`Criterion "${c.id}" is missing or has a non-string "name"`);
+    }
     if (!c.justification || typeof c.justification !== 'string') {
       throw new Error(`Criterion "${c.id}" is missing or has a non-string justification`);
     }
@@ -70,9 +73,13 @@ export function validateEvaluation(raw, rubric) {
     }
   }
 
-  // 5. Recompute weightedScore and grade from verified criterion scores
-  const weightMap      = Object.fromEntries(rubric.criteria.map(c => [c.id, c.weight]));
-  const computed       = parsed.criteria.reduce((s, c) => s + c.score * weightMap[c.id], 0);
+  // 5. Normalise weights and recompute weightedScore and grade
+  //    Claude's reported weights might differ from the rubric — always use rubric values.
+  const weightMap = Object.fromEntries(rubric.criteria.map(c => [c.id, c.weight]));
+  for (const c of parsed.criteria) {
+    c.weight = weightMap[c.id];
+  }
+  const computed       = parsed.criteria.reduce((s, c) => s + c.score * c.weight, 0);
   parsed.weightedScore = Math.round(computed * 100) / 100;
 
   const scaleEntry = rubric.gradingScale.find(
