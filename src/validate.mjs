@@ -14,22 +14,29 @@
  * @throws {Error}         With a descriptive message on any violation.
  */
 export function validateEvaluation(raw, rubric) {
-  // 1. Parse
+  // 1. Strip markdown code fences that Claude occasionally wraps around JSON
+  let cleaned = String(raw).trim();
+  if (cleaned.startsWith('```')) {
+    cleaned = cleaned.replace(/^```(?:json)?\s*\n?([\s\S]*?)\n?```\s*$/, '$1').trim();
+  }
+
+  // 2. Parse
   let parsed;
   try {
-    parsed = JSON.parse(raw);
+    parsed = JSON.parse(cleaned);
   } catch (e) {
     throw new Error(
       `JSON malformat: ${e.message}\n` +
-      `Start of response: ${String(raw).slice(0, 300)}`
+      `Start of response: ${cleaned.slice(0, 300)}`
     );
   }
 
-  // 2. Required top-level fields
-  for (const field of ['criteria', 'overallFeedback']) {
-    if (parsed[field] === undefined) {
-      throw new Error(`Missing required field: "${field}"`);
-    }
+  // 3. Required top-level fields
+  if (parsed.criteria === undefined) {
+    throw new Error('Missing required field: "criteria"');
+  }
+  if (typeof parsed.overallFeedback !== 'string' || !parsed.overallFeedback.trim()) {
+    throw new Error('"overallFeedback" must be a non-empty string');
   }
 
   // 3. criteria must be an array

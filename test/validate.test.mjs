@@ -45,18 +45,67 @@ describe('validateEvaluation', () => {
     }
   });
 
+  // ── Markdown fence stripping ────────────────────────────────────────────────
+
+  it('parses JSON wrapped in ```json ... ``` code fences', () => {
+    const fenced = `\`\`\`json\n${toRaw(validEvaluation)}\n\`\`\``;
+    const result = validateEvaluation(fenced, mockRubric);
+    assert.equal(result.weightedScore, validEvaluation.weightedScore);
+  });
+
+  it('parses JSON wrapped in plain ``` ... ``` code fences', () => {
+    const fenced = `\`\`\`\n${toRaw(validEvaluation)}\n\`\`\``;
+    const result = validateEvaluation(fenced, mockRubric);
+    assert.equal(result.grade, validEvaluation.grade);
+  });
+
+  it('parses bare JSON without any code fences', () => {
+    assert.doesNotThrow(() => validateEvaluation(toRaw(validEvaluation), mockRubric));
+  });
+
   // ── Missing top-level fields ────────────────────────────────────────────────
 
-  for (const field of ['criteria', 'overallFeedback']) {
-    it(`throws when "${field}" is missing`, () => {
-      const ev = { ...validEvaluation };
-      delete ev[field];
-      assert.throws(
-        () => validateEvaluation(toRaw(ev), mockRubric),
-        new RegExp(field)
-      );
-    });
-  }
+  it('throws when "criteria" is missing', () => {
+    const ev = { ...validEvaluation };
+    delete ev.criteria;
+    assert.throws(
+      () => validateEvaluation(toRaw(ev), mockRubric),
+      /criteria/
+    );
+  });
+
+  it('throws when "overallFeedback" is missing', () => {
+    const ev = { ...validEvaluation };
+    delete ev.overallFeedback;
+    assert.throws(
+      () => validateEvaluation(toRaw(ev), mockRubric),
+      /overallFeedback/i
+    );
+  });
+
+  it('throws when "overallFeedback" is not a string', () => {
+    const ev = { ...validEvaluation, overallFeedback: 42 };
+    assert.throws(
+      () => validateEvaluation(toRaw(ev), mockRubric),
+      /overallFeedback/i
+    );
+  });
+
+  it('throws when "overallFeedback" is an empty string', () => {
+    const ev = { ...validEvaluation, overallFeedback: '' };
+    assert.throws(
+      () => validateEvaluation(toRaw(ev), mockRubric),
+      /overallFeedback/i
+    );
+  });
+
+  it('throws when "overallFeedback" is whitespace-only', () => {
+    const ev = { ...validEvaluation, overallFeedback: '   ' };
+    assert.throws(
+      () => validateEvaluation(toRaw(ev), mockRubric),
+      /overallFeedback/i
+    );
+  });
 
   // ── criteria array ──────────────────────────────────────────────────────────
 
