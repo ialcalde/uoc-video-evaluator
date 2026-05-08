@@ -68,7 +68,8 @@ const log = {
 // ── Main ──────────────────────────────────────────────────────────────────────
 async function main() {
   const { driveFolderId, model, thinking, skipExisting, concurrency, outputDir,
-          dryRun, rebuildCsv: doRebuild, version, help } = parseArgs(process.argv);
+          dryRun, rebuildCsv: doRebuild, version, help } =
+    parseArgs(process.argv, flag => log.warn(`Unknown flag ignored: ${flag}`));
 
   if (version) {
     const pkg = JSON.parse(await readFile(join(__dirname, 'package.json'), 'utf8'));

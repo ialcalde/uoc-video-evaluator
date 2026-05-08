@@ -257,6 +257,26 @@ describe('validateRubric', () => {
     assert.throws(() => validateRubric(bad), /missing.*id/i);
   });
 
+  it('throws when a criterion is missing its name', () => {
+    const bad = { ...mockRubric, criteria: [{ ...mockRubric.criteria[0], name: '' }, mockRubric.criteria[1]] };
+    assert.throws(() => validateRubric(bad), /"name"/i);
+  });
+
+  it('throws when a criterion has a non-string name', () => {
+    const bad = { ...mockRubric, criteria: [{ ...mockRubric.criteria[0], name: 42 }, mockRubric.criteria[1]] };
+    assert.throws(() => validateRubric(bad), /"name"/i);
+  });
+
+  it('throws when a criterion is missing its nameEn', () => {
+    const bad = { ...mockRubric, criteria: [{ ...mockRubric.criteria[0], nameEn: '' }, mockRubric.criteria[1]] };
+    assert.throws(() => validateRubric(bad), /"nameEn"/i);
+  });
+
+  it('throws when a criterion has a non-string nameEn', () => {
+    const bad = { ...mockRubric, criteria: [{ ...mockRubric.criteria[0], nameEn: null }, mockRubric.criteria[1]] };
+    assert.throws(() => validateRubric(bad), /"nameEn"/i);
+  });
+
   it('throws when a criterion weight is 0 or greater than 1', () => {
     const zeroWeight = { ...mockRubric, criteria: [{ ...mockRubric.criteria[0], weight: 0 }, mockRubric.criteria[1]] };
     assert.throws(() => validateRubric(zeroWeight), /weight/i);

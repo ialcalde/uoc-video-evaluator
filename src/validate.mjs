@@ -113,6 +113,12 @@ export function validateRubric(rubric) {
     if (!c.id || typeof c.id !== 'string') {
       throw new Error(`${ctx}: missing or non-string "id"`);
     }
+    if (typeof c.name !== 'string' || !c.name.trim()) {
+      throw new Error(`${ctx} ("${c.id}"): "name" must be a non-empty string`);
+    }
+    if (typeof c.nameEn !== 'string' || !c.nameEn.trim()) {
+      throw new Error(`${ctx} ("${c.id}"): "nameEn" must be a non-empty string`);
+    }
     if (typeof c.weight !== 'number' || c.weight <= 0 || c.weight > 1) {
       throw new Error(`${ctx} ("${c.id}"): "weight" must be a number in (0, 1], got ${JSON.stringify(c.weight)}`);
     }
