@@ -1,6 +1,6 @@
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, existsSync } from 'fs';
+import { mkdtempSync, rmSync, existsSync, writeFileSync } from 'fs';
 import { readFile } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
@@ -166,6 +166,28 @@ describe('drive', () => {
     );
 
     assert.ok(!existsSync(destPath), 'partial file should be deleted after stream error');
+  });
+
+  it('downloadVideo: rejects and cleans up when the destination pipe errors (ENOTDIR)', async () => {
+    // Create a FILE at the would-be destDir path so that join(destDir, fileName)
+    // points to an unwritable location — the stream open itself won't fail but the
+    // pipe's write-stream emits an 'error' event, exercising lines 237-239.
+    const badBase = mkdtempSync(join(tmpdir(), 'uoc-drive-notdir-'));
+    const fakeDir = join(badBase, 'notadir.mp4');
+    writeFileSync(fakeDir, 'I am a file');   // fakeDir is now a FILE, not a directory
+
+    try {
+      const okStream = Readable.from([Buffer.from('some video data')]);
+      const drive = { files: { get: async () => ({ data: okStream }) } };
+
+      // join(fakeDir, 'video.mp4') → ENOTDIR because fakeDir is a file
+      await assert.rejects(
+        () => downloadVideo('id', 'video.mp4', fakeDir, drive),
+        /ENOTDIR|not a directory|EISDIR|is a directory/i
+      );
+    } finally {
+      rmSync(badBase, { recursive: true, force: true });
+    }
   });
 
   // ── createDriveClient ───────────────────────────────────────────────────────
