@@ -5,7 +5,7 @@ import { readFile } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { Readable } from 'stream';
-import { listVideos, downloadVideo, createDriveClient } from '../src/drive.mjs';
+import { listVideos, downloadVideo, createDriveClient, authorise } from '../src/drive.mjs';
 
 // Build a minimal mock google.drive client.
 function makeDrive({ files = [], streamChunks = [Buffer.from('data')] } = {}) {
@@ -201,6 +201,65 @@ describe('drive', () => {
     assert.ok(client.files,         'client should have a files namespace');
     assert.ok(client.files.list,    'client.files.list should be a function');
     assert.ok(client.files.get,     'client.files.get should be a function');
+  });
+
+  // ── authorise (saved-token path) ────────────────────────────────────────────
+  // The interactive OAuth2 flow (waitForAuthCode / openBrowser) requires a real
+  // browser and cannot be unit-tested. The saved-token path is testable: we write
+  // a fake token file, point authorise() at it via the tokenPath option, and use
+  // fake GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET env vars.
+
+  it('authorise: throws when GOOGLE_CLIENT_ID is missing', async () => {
+    const savedId     = process.env.GOOGLE_CLIENT_ID;
+    const savedSecret = process.env.GOOGLE_CLIENT_SECRET;
+    try {
+      delete process.env.GOOGLE_CLIENT_ID;
+      process.env.GOOGLE_CLIENT_SECRET = 'fake-secret';
+      await assert.rejects(
+        () => authorise({ info: () => {} }),
+        /GOOGLE_CLIENT_ID|GOOGLE_CLIENT_SECRET/
+      );
+    } finally {
+      if (savedId     === undefined) delete process.env.GOOGLE_CLIENT_ID;
+      else process.env.GOOGLE_CLIENT_ID     = savedId;
+      if (savedSecret === undefined) delete process.env.GOOGLE_CLIENT_SECRET;
+      else process.env.GOOGLE_CLIENT_SECRET = savedSecret;
+    }
+  });
+
+  it('authorise: returns an oauth2 client from a saved token file', async () => {
+    const savedId     = process.env.GOOGLE_CLIENT_ID;
+    const savedSecret = process.env.GOOGLE_CLIENT_SECRET;
+    const tokenBase   = mkdtempSync(join(tmpdir(), 'uoc-drive-auth-'));
+    const tokenPath   = join(tokenBase, 'token.json');
+    try {
+      process.env.GOOGLE_CLIENT_ID     = 'fake-client-id';
+      process.env.GOOGLE_CLIENT_SECRET = 'fake-client-secret';
+
+      const fakeToken = { access_token: 'fake-access', refresh_token: 'fake-refresh', expiry_date: 9999999999999 };
+      writeFileSync(tokenPath, JSON.stringify(fakeToken), 'utf8');
+
+      const logged = [];
+      const result = await authorise({ info: msg => logged.push(msg) }, { tokenPath });
+
+      assert.ok(result,                   'should return an oauth2 client');
+      assert.ok(typeof result.on === 'function', 'client should be an EventEmitter');
+      assert.ok(logged.some(m => m.includes('saved')), 'should log "Using saved OAuth2 token"');
+
+      // Fire the 'tokens' event to exercise the auto-persist callback registered
+      // inside authorise() — covers the lines that merge and re-write the token file.
+      result.emit('tokens', { access_token: 'refreshed-token' });
+      await new Promise(r => setImmediate(r));   // let the async callback flush
+
+      const rewritten = JSON.parse(await readFile(tokenPath, 'utf8'));
+      assert.equal(rewritten.access_token, 'refreshed-token', 'callback should persist the refreshed token');
+    } finally {
+      rmSync(tokenBase, { recursive: true, force: true });
+      if (savedId     === undefined) delete process.env.GOOGLE_CLIENT_ID;
+      else process.env.GOOGLE_CLIENT_ID     = savedId;
+      if (savedSecret === undefined) delete process.env.GOOGLE_CLIENT_SECRET;
+      else process.env.GOOGLE_CLIENT_SECRET = savedSecret;
+    }
   });
 
 });

@@ -121,19 +121,23 @@ function openBrowser(url) {
 /**
  * Obtain an authenticated OAuth2 client.
  * Loads saved token or runs the interactive auth flow.
+ *
+ * @param {object}  log
+ * @param {object}  [opts]
+ * @param {string}  [opts.tokenPath]  Override token file path (default: TOKEN_PATH). Used in tests.
  */
-export async function authorise(log) {
+export async function authorise(log, { tokenPath = TOKEN_PATH } = {}) {
   const oAuth2 = createOAuth2Client();
 
   // ── Reuse saved token ─────────────────────────────────────────────────────
-  if (existsSync(TOKEN_PATH)) {
-    const saved = JSON.parse(await readFile(TOKEN_PATH, 'utf8'));
+  if (existsSync(tokenPath)) {
+    const saved = JSON.parse(await readFile(tokenPath, 'utf8'));
     oAuth2.setCredentials(saved);
 
     // Persist refreshed access tokens automatically
     oAuth2.on('tokens', async newTokens => {
       const merged = { ...saved, ...newTokens };
-      await writeFile(TOKEN_PATH, JSON.stringify(merged, null, 2), 'utf8');
+      await writeFile(tokenPath, JSON.stringify(merged, null, 2), 'utf8');
     });
 
     log.info('[Drive] Using saved OAuth2 token.');
@@ -157,9 +161,9 @@ export async function authorise(log) {
   const code = await waitForAuthCode();
   const { tokens } = await oAuth2.getToken(code);
   oAuth2.setCredentials(tokens);
-  await writeFile(TOKEN_PATH, JSON.stringify(tokens, null, 2), 'utf8');
+  await writeFile(tokenPath, JSON.stringify(tokens, null, 2), 'utf8');
 
-  log.ok(`[Drive] Token saved → ${TOKEN_PATH}`);
+  log.ok(`[Drive] Token saved → ${tokenPath}`);
   return oAuth2;
 }
 
