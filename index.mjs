@@ -20,6 +20,10 @@
  *   --output-dir <path>   Write results to a custom directory (default: output/).
  *   --dry-run             List videos found without calling any API.
  *
+ * Exit codes:
+ *   0  All students evaluated successfully (or dry-run / rebuild-csv).
+ *   1  One or more student evaluations failed, or a fatal error occurred.
+ *
  * Usage:
  *   node index.mjs
  *   node index.mjs --drive-folder 1AbCdEfGhIjKlMnOpQrStUvWxYz
@@ -230,6 +234,8 @@ async function main() {
   log.info(`CSV       ${csvPath}`);
   log.info(`Output    ${OUT_DIR}`);
   log.info('════════════════════════════════════════════════════════');
+
+  if (nError > 0) process.exit(1);
 }
 
 main().catch(err => {
