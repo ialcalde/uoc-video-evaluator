@@ -129,7 +129,7 @@ function buildTranscriptBlock(transcript, rubric) {
  * @param {import('@anthropic-ai/sdk').default} anthropic  Initialised Anthropic client.
  * @returns {Promise<object>}           Validated evaluation object.
  */
-export async function evaluate(transcript, rubric, anthropic, { model = 'claude-sonnet-4-6', thinking = false, onUsage } = {}) {
+export async function evaluate(transcript, rubric, anthropic, { model = 'claude-sonnet-4-6', thinking = false, onUsage, onRetry } = {}) {
   const lang = rubric.feedbackLanguage || 'ca';
 
   const systemConfig = [
@@ -147,8 +147,8 @@ export async function evaluate(transcript, rubric, anthropic, { model = 'claude-
     ...(thinking ? { thinking: { type: 'adaptive' } } : {}),
   };
 
-  const retryLog = ({ attempt, maxRetries, status }) =>
-    console.warn(`[WARN]  evaluate: HTTP ${status} — retry ${attempt}/${maxRetries}`);
+  const retryLog = onRetry ?? (({ attempt, maxRetries, status }) =>
+    console.warn(`[WARN]  evaluate: HTTP ${status} — retry ${attempt}/${maxRetries}`));
 
   // ── First attempt — streamed to avoid timeout on long transcripts ───────
   const first = await withRetry(

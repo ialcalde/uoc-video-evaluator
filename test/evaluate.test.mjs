@@ -282,6 +282,13 @@ describe('evaluate', () => {
     assert.deepEqual(receivedUsage, fakeUsage);
   });
 
+  it('accepts onRetry option without error (omitting it falls back to console.warn)', async () => {
+    const client = makeClient(JSON.stringify(validEvaluation));
+    await assert.doesNotReject(
+      () => evaluate(mockTranscript, mockRubric, client, { onRetry: () => {} })
+    );
+  });
+
   it('does not require onUsage (omitting it is safe)', async () => {
     const client = makeClient(JSON.stringify(validEvaluation));
     await assert.doesNotReject(() => evaluate(mockTranscript, mockRubric, client));

@@ -81,7 +81,9 @@ export async function processVideo({
     let tokenUsage;
     const evaluation = await evaluate(transcript, rubric, anthropic, {
       model, thinking,
-      onUsage: u => { tokenUsage = u; },
+      onUsage:  u => { tokenUsage = u; },
+      onRetry: ({ attempt, maxRetries, status }) =>
+        log.warn?.(`[${student}] Claude HTTP ${status} — retry ${attempt}/${maxRetries}`),
     });
     evaluation.evaluatedAt = new Date().toISOString();
 

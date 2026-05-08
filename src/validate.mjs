@@ -39,12 +39,12 @@ export function validateEvaluation(raw, rubric) {
     throw new Error('"overallFeedback" must be a non-empty string');
   }
 
-  // 3. criteria must be an array
+  // 4. criteria must be an array
   if (!Array.isArray(parsed.criteria)) {
     throw new Error('"criteria" must be an array');
   }
 
-  // 4. Each rubric criterion must be present with a valid score and justification
+  // 5. Each rubric criterion must be present with a valid score and justification
   const rubricIds = new Set(rubric.criteria.map(c => c.id));
   const parsedIds = new Set(parsed.criteria.map(c => c.id));
 
@@ -78,7 +78,7 @@ export function validateEvaluation(raw, rubric) {
     }
   }
 
-  // 5. Normalise name, weight, order, and recompute weightedScore and grade.
+  // 6. Normalise name, weight, order, and recompute weightedScore and grade.
   //    Always use rubric-canonical values regardless of what Claude returned.
   const rubricMap = Object.fromEntries(rubric.criteria.map(c => [c.id, c]));
   for (const c of parsed.criteria) {
