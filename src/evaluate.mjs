@@ -129,7 +129,7 @@ function buildTranscriptBlock(transcript, rubric) {
  * @param {import('@anthropic-ai/sdk').default} anthropic  Initialised Anthropic client.
  * @returns {Promise<object>}           Validated evaluation object.
  */
-export async function evaluate(transcript, rubric, anthropic, { model = 'claude-sonnet-4-6', thinking = false, onUsage, onRetry } = {}) {
+export async function evaluate(transcript, rubric, anthropic, { model = 'claude-sonnet-4-6', thinking = false, onUsage, onRetry, baseDelay } = {}) {
   const lang = rubric.feedbackLanguage || 'ca';
 
   const systemConfig = [
@@ -156,7 +156,7 @@ export async function evaluate(transcript, rubric, anthropic, { model = 'claude-
       ...callParams,
       messages: [{ role: 'user', content: userContent }],
     }).finalMessage(),
-    { onRetry: retryLog }
+    { onRetry: retryLog, baseDelay }
   );
 
   const firstText = first.content.find(b => b.type === 'text');
@@ -182,7 +182,7 @@ export async function evaluate(transcript, rubric, anthropic, { model = 'claude-
           },
         ],
       }).finalMessage(),
-      { onRetry: retryLog }
+      { onRetry: retryLog, baseDelay }
     );
 
     const retryText = retry.content.find(b => b.type === 'text');

@@ -289,9 +289,128 @@ describe('evaluate', () => {
     );
   });
 
+  it('uses console.warn fallback when onRetry is absent and HTTP retry fires', async () => {
+    let calls = 0;
+    const client = {
+      messages: {
+        stream: () => ({
+          finalMessage: async () => {
+            calls++;
+            if (calls === 1) { const e = new Error('rate limited'); e.status = 429; throw e; }
+            return { content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] };
+          },
+        }),
+        create: async () => ({ content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] }),
+      },
+    };
+    // omit onRetry → the console.warn fallback function is used; baseDelay:0 keeps the test instant
+    const result = await evaluate(mockTranscript, mockRubric, client, { baseDelay: 0 });
+    assert.equal(result.weightedScore, validEvaluation.weightedScore);
+  });
+
+  it('handles absent usage on retry attempt — reports only first-attempt usage', async () => {
+    const firstUsage = { input_tokens: 800, output_tokens: 200,
+                         cache_read_input_tokens: 400, cache_creation_input_tokens: 0 };
+    let call = 0;
+    const client = {
+      messages: {
+        stream: () => ({
+          finalMessage: async () => {
+            call++;
+            if (call === 1) {
+              const broken = { ...validEvaluation };
+              delete broken.overallFeedback;
+              return { content: [{ type: 'text', text: JSON.stringify(broken) }], usage: firstUsage };
+            }
+            // Retry returns no usage field
+            return { content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] };
+          },
+        }),
+        create: async () => ({ content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] }),
+      },
+    };
+
+    let receivedUsage;
+    await evaluate(mockTranscript, mockRubric, client, { onUsage: u => { receivedUsage = u; } });
+
+    assert.equal(receivedUsage.input_tokens, 800, 'should use firstUsage (retry has no usage)');
+    assert.equal(receivedUsage.output_tokens, 200);
+  });
+
+  it('throws when first API response contains no text block', async () => {
+    const client = {
+      messages: {
+        stream: () => ({
+          finalMessage: async () => ({
+            content: [{ type: 'thinking', thinking: 'Only thinking, no text block' }],
+          }),
+        }),
+        create: async () => ({ content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] }),
+      },
+    };
+    await assert.rejects(
+      () => evaluate(mockTranscript, mockRubric, client),
+      /no text content.*first attempt/i
+    );
+  });
+
+  it('throws when schema-correction retry response contains no text block', async () => {
+    let call = 0;
+    const client = {
+      messages: {
+        stream: () => ({
+          finalMessage: async () => {
+            call++;
+            if (call === 1) {
+              // First attempt: invalid JSON triggers the correction retry path
+              return { content: [{ type: 'text', text: 'invalid json {' }] };
+            }
+            // Correction retry: only a thinking block, no text
+            return { content: [{ type: 'thinking', thinking: 'Thinking only, no text' }] };
+          },
+        }),
+        create: async () => ({ content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] }),
+      },
+    };
+    await assert.rejects(
+      () => evaluate(mockTranscript, mockRubric, client),
+      /no text content.*retry/i
+    );
+  });
+
   it('does not require onUsage (omitting it is safe)', async () => {
     const client = makeClient(JSON.stringify(validEvaluation));
     await assert.doesNotReject(() => evaluate(mockTranscript, mockRubric, client));
+  });
+
+  it('handles absent usage on first attempt — reports only retry usage', async () => {
+    // first.usage is undefined (API didn't return usage field);
+    // retry.usage is defined — combined total should equal retryUsage alone.
+    const retryUsage = { input_tokens: 600, output_tokens: 120,
+                         cache_read_input_tokens: 0, cache_creation_input_tokens: 50 };
+    let call = 0;
+    const client = {
+      messages: {
+        stream: () => ({
+          finalMessage: async () => {
+            call++;
+            if (call === 1) {
+              const broken = { ...validEvaluation };
+              delete broken.overallFeedback;
+              return { content: [{ type: 'text', text: JSON.stringify(broken) }] }; // no usage
+            }
+            return { content: [{ type: 'text', text: JSON.stringify(validEvaluation) }], usage: retryUsage };
+          },
+        }),
+        create: async () => ({ content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] }),
+      },
+    };
+
+    let receivedUsage;
+    await evaluate(mockTranscript, mockRubric, client, { onUsage: u => { receivedUsage = u; } });
+
+    assert.equal(receivedUsage.input_tokens,              600, 'should fall back to 0 for missing first.usage');
+    assert.equal(receivedUsage.cache_creation_input_tokens, 50);
   });
 
   it('combines first-attempt and correction-retry token usage in onUsage', async () => {
