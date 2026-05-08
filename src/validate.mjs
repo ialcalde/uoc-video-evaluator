@@ -48,11 +48,16 @@ export function validateEvaluation(raw, rubric) {
   const rubricIds = new Set(rubric.criteria.map(c => c.id));
   const parsedIds = new Set(parsed.criteria.map(c => c.id));
 
-  // Unknown IDs first (catches Claude hallucinating criterion names)
+  // Unknown or duplicate IDs first (catches Claude hallucinating or repeating criterion names)
+  const seenIds = new Set();
   for (const c of parsed.criteria) {
     if (!c.id || !rubricIds.has(c.id)) {
       throw new Error(`Unknown or missing criterion id: "${c.id}"`);
     }
+    if (seenIds.has(c.id)) {
+      throw new Error(`Duplicate criterion id in evaluation: "${c.id}"`);
+    }
+    seenIds.add(c.id);
     if (typeof c.score !== 'number' || c.score < 0 || c.score > 10) {
       throw new Error(
         `Criterion "${c.id}" has invalid score: ${JSON.stringify(c.score)} (must be number 0–10)`

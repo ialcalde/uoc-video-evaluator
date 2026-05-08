@@ -324,6 +324,20 @@ describe('validateEvaluation', () => {
     assert.equal(result.grade, 'Fail', 'score 4.95 falls below the 5.0 threshold → Fail');
   });
 
+  it('throws when Claude returns the same criterion id twice', () => {
+    const ev = {
+      ...validEvaluation,
+      criteria: [
+        validEvaluation.criteria[0],   // content_accuracy
+        validEvaluation.criteria[0],   // content_accuracy again (duplicate)
+      ],
+    };
+    assert.throws(
+      () => validateEvaluation(toRaw(ev), mockRubric),
+      /duplicate criterion id/i
+    );
+  });
+
   it('throws when a rubric criterion is absent from the evaluation', () => {
     const ev = { ...validEvaluation, criteria: [validEvaluation.criteria[0]] };  // only 1 of 2
     assert.throws(
