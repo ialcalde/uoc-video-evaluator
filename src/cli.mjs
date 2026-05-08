@@ -2,7 +2,7 @@
  * CLI argument parsing — extracted for testability.
  */
 
-const DEFAULT_MODEL = 'claude-sonnet-4-6';
+const DEFAULT_MODEL = 'claude-opus-4-7';
 
 export const USAGE = `
 UOC Video Evaluator
@@ -20,7 +20,7 @@ Options:
   --output-dir <path>   Write results to a custom directory (default: output/).
   --dry-run             List found videos without calling any API.
   --rebuild-csv         Regenerate results.csv from existing evaluation.json files (no API calls).
-  --thinking            Enable adaptive thinking for deeper reasoning (needs claude-opus-4-7).
+  --thinking            Enable adaptive thinking for deeper reasoning.
   --version             Print the package version and exit.
   --help, -h            Show this help message.
 
@@ -60,9 +60,6 @@ Examples:
 export function parseArgs(argv, onUnknown = flag => console.warn(`[WARN]  Unknown flag: ${flag}`)) {
   const args = argv.slice(2);
   const opts = {};
-
-  // Flags that consume the next argument as their value
-  const VALUE_FLAGS = new Set(['--drive-folder', '--model', '--concurrency', '--output-dir']);
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--drive-folder' && args[i + 1]) {

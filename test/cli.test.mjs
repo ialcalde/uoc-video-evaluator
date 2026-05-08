@@ -27,7 +27,7 @@ describe('parseArgs', () => {
     delete process.env.ANTHROPIC_MODEL;
     const opts = parseArgs(argv());
     assert.equal(opts.driveFolderId, null);
-    assert.equal(opts.model,         'claude-sonnet-4-6');
+    assert.equal(opts.model,         'claude-opus-4-7');
     assert.equal(opts.skipExisting,  false);
     assert.equal(opts.concurrency,   3);
     assert.equal(opts.outputDir,     null);
