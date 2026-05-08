@@ -180,18 +180,26 @@ export function createDriveClient(auth) {
  * @returns {Promise<Array<{id:string, name:string, size:string}>>}
  */
 export async function listVideos(folderId, drive) {
-  const mimeQuery = VIDEO_MIMES.map(m => `mimeType='${m}'`).join(' or ');
-
-  const res = await drive.files.list({
-    q: `'${folderId}' in parents and (${mimeQuery}) and trashed=false`,
-    fields:                    'files(id,name,size,mimeType)',
+  const mimeQuery  = VIDEO_MIMES.map(m => `mimeType='${m}'`).join(' or ');
+  const baseParams = {
+    q:                         `'${folderId}' in parents and (${mimeQuery}) and trashed=false`,
+    fields:                    'nextPageToken,files(id,name,size,mimeType)',
     pageSize:                  1000,
     supportsAllDrives:         true,
     includeItemsFromAllDrives: true,
     orderBy:                   'name',
-  });
+  };
 
-  return res.data.files ?? [];
+  const allFiles = [];
+  let pageToken;
+  do {
+    const params = pageToken ? { ...baseParams, pageToken } : baseParams;
+    const res    = await drive.files.list(params);
+    allFiles.push(...(res.data.files ?? []));
+    pageToken = res.data.nextPageToken;
+  } while (pageToken);
+
+  return allFiles;
 }
 
 /**

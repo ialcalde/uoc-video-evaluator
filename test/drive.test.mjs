@@ -61,6 +61,32 @@ describe('drive', () => {
     assert.ok(capturedParams.q.includes('trashed=false'),  'query should exclude trashed files');
   });
 
+  it('listVideos: follows nextPageToken to retrieve all pages', async () => {
+    const page1 = [{ id: 'a', name: 'alice.mp4', size: '1' }];
+    const page2 = [{ id: 'b', name: 'bob.mp4',   size: '2' }];
+    let calls   = 0;
+
+    const drive = {
+      files: {
+        list: async params => {
+          calls++;
+          if (calls === 1) {
+            assert.ok(!params.pageToken, 'first call should not have pageToken');
+            return { data: { files: page1, nextPageToken: 'token-abc' } };
+          }
+          assert.equal(params.pageToken, 'token-abc', 'second call should use nextPageToken');
+          return { data: { files: page2 } };
+        },
+      },
+    };
+
+    const result = await listVideos('folder-id', drive);
+    assert.equal(calls, 2, 'should make exactly two API calls');
+    assert.equal(result.length, 2, 'should return files from both pages');
+    assert.equal(result[0].name, 'alice.mp4');
+    assert.equal(result[1].name, 'bob.mp4');
+  });
+
   // ── downloadVideo ───────────────────────────────────────────────────────────
 
   it('downloadVideo: writes stream data to destDir/fileName', async () => {
