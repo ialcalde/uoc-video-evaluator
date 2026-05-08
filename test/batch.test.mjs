@@ -79,6 +79,24 @@ describe('runBatch', () => {
     assert.equal(maxActive, 3, 'should cap workers at entry count');
   });
 
+  it('returns results in input order even when tasks finish out-of-order', async () => {
+    // Tasks take 30ms, 10ms, 20ms — they complete as 2, 3, 1 but must be returned as 1, 2, 3
+    const completionOrder = [];
+    const results = await runBatch(
+      ['slow', 'fast', 'medium'],
+      async (name) => {
+        const delays = { slow: 30, fast: 10, medium: 20 };
+        await delay(delays[name]);
+        completionOrder.push(name);
+        return `${name}-done`;
+      },
+      3,    // all run concurrently
+    );
+
+    assert.deepEqual(completionOrder, ['fast', 'medium', 'slow'], 'completion order should be by duration');
+    assert.deepEqual(results, ['slow-done', 'fast-done', 'medium-done'], 'results must match input order');
+  });
+
   it('passes the entry index as second argument to fn', async () => {
     const indices = [];
     await runBatch(['a', 'b', 'c'], async (entry, i) => { indices.push(i); }, 1);
