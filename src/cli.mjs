@@ -87,8 +87,6 @@ export function parseArgs(argv, onUnknown = flag => console.warn(`[WARN]  Unknow
       opts.help = true;
     } else if (args[i].startsWith('-')) {
       onUnknown(args[i]);
-      // Skip the following argument if this flag looks like it takes a value
-      if (VALUE_FLAGS.has(args[i]) && args[i + 1]) i++;
     }
   }
 
