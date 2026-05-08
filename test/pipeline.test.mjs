@@ -49,9 +49,6 @@ describe('processVideo', () => {
     writeFileSync(join(studentDir, 'evaluation.json'), JSON.stringify(validEvaluation), 'utf8');
     writeFileSync(join(studentDir, 'feedback_ca.txt'), 'cached feedback', 'utf8');
 
-    let transcribeCalled = false;
-    const trackingTranscribe = async () => { transcribeCalled = true; return { text: 'x', segments: [] }; };
-
     const result = await processVideo({
       videoPath:      '/fake/video.mp4',
       student,
@@ -63,11 +60,14 @@ describe('processVideo', () => {
       skipExisting:   true,
       log:            noop,
       extractAudioFn: noopExtract,
-      transcribeFn:   trackingTranscribe,
+      transcribeFn:   makeTranscribe(),   // covered elsewhere; never called on cache hit
     });
 
+    // Cache hits return tokenUsage:null and preserve the stored evaluatedAt timestamp.
+    // If the cache were missed, a fresh evaluation would set a new evaluatedAt.
     assert.equal(result.evaluation.weightedScore, validEvaluation.weightedScore, 'should return cached result');
-    assert.equal(transcribeCalled, false, 'should not call Whisper when skipping');
+    assert.equal(result.tokenUsage, null, 'cache hit should return null tokenUsage');
+    assert.equal(result.evaluation.evaluatedAt, validEvaluation.evaluatedAt, 'should preserve cached evaluatedAt');
   });
 
   it('does not skip when skipExisting=true but evaluation.json is absent', async () => {
