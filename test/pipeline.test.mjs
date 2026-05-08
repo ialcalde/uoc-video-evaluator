@@ -332,6 +332,33 @@ describe('processVideo', () => {
     assert.ok(!existsSync(capturedAudioPath), 'temp audio file should be deleted after error');
   });
 
+  it('swallows unlink errors in finally (EISDIR race-condition guard)', async () => {
+    // If a DIRECTORY is created at the audioPath, existsSync returns true but
+    // unlink throws EISDIR. The catch{} block should swallow it silently and
+    // allow the result to be returned normally.
+    const student = 'eisdir_student';
+
+    const extractWithDir = async (_src, audioPath) => {
+      mkdirSync(audioPath);   // put a dir where the file would be
+    };
+
+    const result = await processVideo({
+      videoPath:      '/fake/video.mp4',
+      student,
+      anthropic:      makeAnthropic(),
+      openai:         {},
+      rubric:         mockRubric,
+      outputDir:      outDir,
+      tmpDir,
+      log:            noop,
+      extractAudioFn: extractWithDir,
+      transcribeFn:   makeTranscribe(),
+    });
+
+    assert.equal(result.evaluation.weightedScore, validEvaluation.weightedScore,
+      'should return evaluation despite unlink failure in finally');
+  });
+
   it('does not leave temp audio files after a successful run', async () => {
     const student     = 'no_leak_student';
     const filesBefore = readdirSync(tmpDir);

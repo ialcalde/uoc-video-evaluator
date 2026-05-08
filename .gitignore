@@ -1,4 +1,5 @@
 node_modules/
+coverage.lcov
 .env
 .google-token.json
 output/*
