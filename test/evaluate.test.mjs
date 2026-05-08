@@ -259,4 +259,38 @@ describe('evaluate', () => {
     const client = makeClient(JSON.stringify(validEvaluation));
     await assert.doesNotReject(() => evaluate(mockTranscript, mockRubric, client));
   });
+
+  it('combines first-attempt and correction-retry token usage in onUsage', async () => {
+    const firstUsage = { input_tokens: 1000, output_tokens: 200,
+                         cache_read_input_tokens: 400, cache_creation_input_tokens: 0 };
+    const retryUsage = { input_tokens: 500,  output_tokens: 150,
+                         cache_read_input_tokens: 200, cache_creation_input_tokens: 0 };
+
+    let call = 0;
+    const client = {
+      messages: {
+        stream: () => ({
+          finalMessage: async () => {
+            call++;
+            if (call === 1) {
+              // First attempt: valid JSON but missing overallFeedback to trigger correction
+              const broken = { ...validEvaluation };
+              delete broken.overallFeedback;
+              return { content: [{ type: 'text', text: JSON.stringify(broken) }], usage: firstUsage };
+            }
+            // Correction retry: valid JSON
+            return { content: [{ type: 'text', text: JSON.stringify(validEvaluation) }], usage: retryUsage };
+          },
+        }),
+        create: async () => ({ content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] }),
+      },
+    };
+
+    let receivedUsage;
+    await evaluate(mockTranscript, mockRubric, client, { onUsage: u => { receivedUsage = u; } });
+
+    assert.equal(receivedUsage.input_tokens,              1500, 'input should be summed');
+    assert.equal(receivedUsage.output_tokens,              350, 'output should be summed');
+    assert.equal(receivedUsage.cache_read_input_tokens,    600, 'cache-hit should be summed');
+  });
 });

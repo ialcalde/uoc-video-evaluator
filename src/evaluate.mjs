@@ -163,10 +163,10 @@ export async function evaluate(transcript, rubric, anthropic, { model = 'claude-
   if (!firstText) throw new Error('Claude returned no text content in first attempt');
   const rawFirst = firstText.text.trim();
 
-  onUsage?.(first.usage);
-
   try {
-    return validateEvaluation(rawFirst, rubric);
+    const result = validateEvaluation(rawFirst, rubric);
+    onUsage?.(first.usage);  // called exactly once on the happy path
+    return result;
   } catch (firstError) {
     // ── Schema-correction retry — streamed for the same timeout-safety reason as the
     //    first call; the input (rubric + transcript + first response) can be large.
@@ -188,6 +188,19 @@ export async function evaluate(transcript, rubric, anthropic, { model = 'claude-
     const retryText = retry.content.find(b => b.type === 'text');
     if (!retryText) throw new Error('Claude returned no text content in schema-correction retry');
     const rawRetry = retryText.text.trim();
+
+    // Report combined token usage (first attempt + correction retry) exactly once.
+    if (onUsage) {
+      const f = first.usage ?? {};
+      const r = retry.usage ?? {};
+      onUsage({
+        input_tokens:                (f.input_tokens                ?? 0) + (r.input_tokens                ?? 0),
+        output_tokens:               (f.output_tokens               ?? 0) + (r.output_tokens               ?? 0),
+        cache_read_input_tokens:     (f.cache_read_input_tokens     ?? 0) + (r.cache_read_input_tokens     ?? 0),
+        cache_creation_input_tokens: (f.cache_creation_input_tokens ?? 0) + (r.cache_creation_input_tokens ?? 0),
+      });
+    }
+
     return validateEvaluation(rawRetry, rubric);
   }
 }
