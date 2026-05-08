@@ -6,9 +6,9 @@
  *   (default)                                               → read from input_videos/
  *
  * Per-student output (output/<student>/):
- *   transcript_ca.txt   — Catalan transcript (Whisper)
- *   evaluation.json     — Claude's structured evaluation
- *   feedback_ca.txt     — Human-readable feedback in Catalan
+ *   transcript_{lang}.txt  — Whisper transcript (lang from rubric.language)
+ *   evaluation.json        — Claude's structured evaluation
+ *   feedback_{lang}.txt    — Human-readable feedback (lang from rubric.feedbackLanguage)
  *
  * Consolidated output:
  *   output/results.csv

@@ -59,10 +59,13 @@ export function ensureStudentDir(outputDir, student) {
 }
 
 /**
- * Write transcript_ca.txt
+ * Write transcript_{lang}.txt
+ * @param {string} studentDir
+ * @param {string} transcriptText
+ * @param {string} [lang='ca']  BCP-47 language code used as filename suffix.
  */
-export async function writeTranscript(studentDir, transcriptText) {
-  await writeFile(join(studentDir, 'transcript_ca.txt'), transcriptText, 'utf8');
+export async function writeTranscript(studentDir, transcriptText, lang = 'ca') {
+  await writeFile(join(studentDir, `transcript_${lang}.txt`), transcriptText, 'utf8');
 }
 
 /**
@@ -105,34 +108,50 @@ export async function rebuildCsv(outputDir, rubric) {
   return writeCsv(outputDir, results, rubric);
 }
 
-export async function writeFeedback(studentDir, evaluation) {
+const I18N = {
+  ca: { evaluatedAt: "Data d'avaluació", score: 'Nota',    grade: 'Qualificació', criteria: 'DETALL PER CRITERI', overall: 'VALORACIÓ GLOBAL',  weight: 'pes', scoreLabel: 'Puntuació' },
+  es: { evaluatedAt: 'Fecha de evaluación', score: 'Nota', grade: 'Calificación', criteria: 'DETALLE POR CRITERIO', overall: 'VALORACIÓN GLOBAL', weight: 'peso', scoreLabel: 'Puntuación' },
+  en: { evaluatedAt: 'Evaluation date',   score: 'Score', grade: 'Grade',        criteria: 'CRITERIA DETAIL',     overall: 'OVERALL FEEDBACK',   weight: 'weight', scoreLabel: 'Score' },
+};
+
+/**
+ * Write feedback_{lang}.txt — human-readable evaluation summary.
+ * Structural labels are localised for 'ca', 'es', and 'en'; other lang codes fall back to 'en'.
+ * @param {string} studentDir
+ * @param {object} evaluation
+ * @param {string} [lang='ca']  BCP-47 language code used for both filename and labels.
+ */
+export async function writeFeedback(studentDir, evaluation, lang = 'ca') {
+  const t = I18N[lang] ?? I18N.en;
+  const SEP = '══════════════════════════════════════════════════════';
+
   const lines = [
-    `Data d'avaluació : ${evaluation.evaluatedAt}`,
-    `Nota             : ${evaluation.weightedScore} / 10`,
-    `Qualificació     : ${evaluation.grade}`,
+    `${t.evaluatedAt} : ${evaluation.evaluatedAt}`,
+    `${t.score.padEnd(16)} : ${evaluation.weightedScore} / 10`,
+    `${t.grade.padEnd(16)} : ${evaluation.grade}`,
     '',
-    '══════════════════════════════════════════════════════',
-    'DETALL PER CRITERI',
-    '══════════════════════════════════════════════════════',
+    SEP,
+    t.criteria,
+    SEP,
     '',
   ];
 
   for (const c of evaluation.criteria) {
     const filled = Math.round(c.score);
     const bar = '█'.repeat(filled) + '░'.repeat(10 - filled);
-    lines.push(`${c.name} (pes ${c.weight})`);
-    lines.push(`  Puntuació : ${c.score}/10  [${bar}]`);
+    lines.push(`${c.name} (${t.weight} ${c.weight})`);
+    lines.push(`  ${t.scoreLabel} : ${c.score}/10  [${bar}]`);
     lines.push(`  ${c.justification}`);
     lines.push('');
   }
 
   lines.push(
-    '══════════════════════════════════════════════════════',
-    'VALORACIÓ GLOBAL',
-    '══════════════════════════════════════════════════════',
+    SEP,
+    t.overall,
+    SEP,
     '',
     evaluation.overallFeedback,
   );
 
-  await writeFile(join(studentDir, 'feedback_ca.txt'), lines.join('\n'), 'utf8');
+  await writeFile(join(studentDir, `feedback_${lang}.txt`), lines.join('\n'), 'utf8');
 }

@@ -251,4 +251,94 @@ describe('processVideo', () => {
     assert.equal(filesAfter.length, filesBefore.length, 'no new temp files after success');
   });
 
+  // ── Language-aware filenames ──────────────────────────────────────────────────
+
+  it('writes transcript_{lang}.txt using rubric.language', async () => {
+    const student   = 'lang_transcript_student';
+    const esRubric  = { ...mockRubric, language: 'es', feedbackLanguage: 'es' };
+
+    await processVideo({
+      videoPath:      '/fake/video.mp4',
+      student,
+      anthropic:      makeAnthropic(),
+      openai:         {},
+      rubric:         esRubric,
+      outputDir:      outDir,
+      tmpDir,
+      log:            noop,
+      extractAudioFn: noopExtract,
+      transcribeFn:   makeTranscribe('Hola soy estudiante.'),
+    });
+
+    const studentDir = join(outDir, student);
+    assert.ok(existsSync(join(studentDir, 'transcript_es.txt')), 'transcript_es.txt should exist');
+    assert.ok(!existsSync(join(studentDir, 'transcript_ca.txt')), 'transcript_ca.txt should not exist');
+    assert.ok(existsSync(join(studentDir, 'feedback_es.txt')), 'feedback_es.txt should exist');
+    assert.ok(!existsSync(join(studentDir, 'feedback_ca.txt')), 'feedback_ca.txt should not exist');
+  });
+
+  // ── model and thinking forwarding ─────────────────────────────────────────────
+
+  it('forwards the model option to evaluate', async () => {
+    let capturedModel;
+    const trackingAnthropic = {
+      messages: {
+        stream: params => ({
+          finalMessage: async () => {
+            capturedModel = params.model;
+            return { content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] };
+          },
+        }),
+        create: async () => ({ content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] }),
+      },
+    };
+
+    await processVideo({
+      videoPath:      '/fake/video.mp4',
+      student:        'model_fwd_student',
+      anthropic:      trackingAnthropic,
+      openai:         {},
+      rubric:         mockRubric,
+      outputDir:      outDir,
+      tmpDir,
+      model:          'claude-opus-4-7',
+      log:            noop,
+      extractAudioFn: noopExtract,
+      transcribeFn:   makeTranscribe(),
+    });
+
+    assert.equal(capturedModel, 'claude-opus-4-7');
+  });
+
+  it('forwards the thinking option to evaluate', async () => {
+    let capturedThinking;
+    const trackingAnthropic = {
+      messages: {
+        stream: params => ({
+          finalMessage: async () => {
+            capturedThinking = params.thinking;
+            return { content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] };
+          },
+        }),
+        create: async () => ({ content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] }),
+      },
+    };
+
+    await processVideo({
+      videoPath:      '/fake/video.mp4',
+      student:        'thinking_fwd_student',
+      anthropic:      trackingAnthropic,
+      openai:         {},
+      rubric:         mockRubric,
+      outputDir:      outDir,
+      tmpDir,
+      thinking:       true,
+      log:            noop,
+      extractAudioFn: noopExtract,
+      transcribeFn:   makeTranscribe(),
+    });
+
+    assert.deepEqual(capturedThinking, { type: 'adaptive' });
+  });
+
 });

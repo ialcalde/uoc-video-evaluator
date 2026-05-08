@@ -60,16 +60,17 @@ export async function processVideo({
     await extractAudioFn(videoPath, audioPath);
 
     // 2. Transcribe
-    const lang = rubric.language || 'ca';
-    log.info(`[${student}] Transcribing (Whisper, lang=${lang})…`);
-    const transcript = await transcribeFn(audioPath, openai, { language: lang });
+    const transcriptLang = rubric.language      || 'ca';
+    const feedbackLang   = rubric.feedbackLanguage || 'ca';
+    log.info(`[${student}] Transcribing (Whisper, lang=${transcriptLang})…`);
+    const transcript = await transcribeFn(audioPath, openai, { language: transcriptLang });
 
     if (!transcript.text?.trim()) {
       throw new Error('Transcription is empty — does the video have audio?');
     }
 
-    await writeTranscript(studentDir, transcript.text);
-    log.info(`[${student}] transcript_ca.txt saved (${transcript.text.length} chars).`);
+    await writeTranscript(studentDir, transcript.text, transcriptLang);
+    log.info(`[${student}] transcript_${transcriptLang}.txt saved (${transcript.text.length} chars).`);
 
     // 3. Evaluate
     log.info(`[${student}] Evaluating with Claude…`);
@@ -78,7 +79,7 @@ export async function processVideo({
 
     // 4. Write output files
     await writeEvaluation(studentDir, evaluation);
-    await writeFeedback(studentDir, evaluation);
+    await writeFeedback(studentDir, evaluation, feedbackLang);
 
     const elapsedS = ((Date.now() - start) / 1000).toFixed(1);
     log.ok(`[${student}] Done — score: ${evaluation.weightedScore}/10  (${evaluation.grade}) — ${elapsedS}s`);

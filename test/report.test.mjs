@@ -44,10 +44,17 @@ describe('report', () => {
   it('writes the transcript text verbatim to transcript_ca.txt', async () => {
     const dir  = ensureStudentDir(tmpBase, 'transcript_student');
     const text = 'Hola, sóc estudiant de la UOC i avui presentaré el meu treball.';
-    await writeTranscript(dir, text);
+    await writeTranscript(dir, text, 'ca');
 
     const content = await readFile(join(dir, 'transcript_ca.txt'), 'utf8');
     assert.equal(content, text);
+  });
+
+  it('writeTranscript uses lang code in filename', async () => {
+    const dir = ensureStudentDir(tmpBase, 'transcript_en_student');
+    await writeTranscript(dir, 'Hello world', 'en');
+    assert.ok(existsSync(join(dir, 'transcript_en.txt')), 'should create transcript_en.txt');
+    assert.ok(!existsSync(join(dir, 'transcript_ca.txt')), 'should not create transcript_ca.txt');
   });
 
   // ── writeEvaluation ─────────────────────────────────────────────────────────
@@ -68,7 +75,7 @@ describe('report', () => {
 
   it('writes feedback_ca.txt containing score, grade, and overallFeedback', async () => {
     const dir = ensureStudentDir(tmpBase, 'feedback_student');
-    await writeFeedback(dir, validEvaluation);
+    await writeFeedback(dir, validEvaluation, 'ca');
 
     const content = await readFile(join(dir, 'feedback_ca.txt'), 'utf8');
 
@@ -88,13 +95,34 @@ describe('report', () => {
 
   it('includes each criterion name and justification in feedback_ca.txt', async () => {
     const dir = ensureStudentDir(tmpBase, 'feedback_criteria_student');
-    await writeFeedback(dir, validEvaluation);
+    await writeFeedback(dir, validEvaluation, 'ca');
 
     const content = await readFile(join(dir, 'feedback_ca.txt'), 'utf8');
 
     for (const c of validEvaluation.criteria) {
       assert.ok(content.includes(c.justification), `missing justification for ${c.id}`);
     }
+  });
+
+  it('writeFeedback uses lang code in filename and localises headings', async () => {
+    const dir = ensureStudentDir(tmpBase, 'feedback_en_student');
+    await writeFeedback(dir, validEvaluation, 'en');
+
+    assert.ok(existsSync(join(dir, 'feedback_en.txt')), 'should create feedback_en.txt');
+    assert.ok(!existsSync(join(dir, 'feedback_ca.txt')), 'should not create feedback_ca.txt');
+
+    const content = await readFile(join(dir, 'feedback_en.txt'), 'utf8');
+    assert.ok(content.includes('OVERALL FEEDBACK'), 'English heading should appear');
+    assert.ok(content.includes('CRITERIA DETAIL'),  'English heading should appear');
+    assert.ok(content.includes(validEvaluation.overallFeedback), 'feedback text should appear');
+  });
+
+  it('writeFeedback falls back to English headings for unknown lang', async () => {
+    const dir = ensureStudentDir(tmpBase, 'feedback_de_student');
+    await writeFeedback(dir, validEvaluation, 'de');
+
+    const content = await readFile(join(dir, 'feedback_de.txt'), 'utf8');
+    assert.ok(content.includes('OVERALL FEEDBACK'), 'should fall back to English heading');
   });
 
   // ── csvField ────────────────────────────────────────────────────────────────
