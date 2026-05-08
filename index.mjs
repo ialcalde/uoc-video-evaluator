@@ -179,6 +179,9 @@ async function main() {
     concurrency
   );
 
+  // ── Sort results alphabetically for consistent CSV and summary output ───────
+  results.sort((a, b) => a.student.localeCompare(b.student));
+
   // ── Write CSV ───────────────────────────────────────────────────────────────
   const csvPath = await writeCsv(OUT_DIR, results, rubric);
 

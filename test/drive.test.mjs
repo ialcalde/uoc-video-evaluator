@@ -126,4 +126,20 @@ describe('drive', () => {
     );
   });
 
+  it('downloadVideo: cleans up the partial file when stream errors', async () => {
+    const destName  = 'cleanup_on_error.mp4';
+    const destPath  = join(tmpDir, destName);
+    const errStream = new Readable({
+      read() { this.push(Buffer.from('partial')); this.destroy(new Error('mid-stream failure')); },
+    });
+    const drive = { files: { get: async () => ({ data: errStream }) } };
+
+    await assert.rejects(
+      () => downloadVideo('id', destName, tmpDir, drive),
+      /mid-stream failure/
+    );
+
+    assert.ok(!existsSync(destPath), 'partial file should be deleted after stream error');
+  });
+
 });
