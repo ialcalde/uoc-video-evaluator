@@ -81,7 +81,7 @@ function buildTranscriptBlock(transcript, rubric) {
  * @param {import('@anthropic-ai/sdk').default} anthropic  Initialised Anthropic client.
  * @returns {Promise<object>}           Validated evaluation object.
  */
-export async function evaluate(transcript, rubric, anthropic, { model = 'claude-sonnet-4-6', thinking = false } = {}) {
+export async function evaluate(transcript, rubric, anthropic, { model = 'claude-sonnet-4-6', thinking = false, onUsage } = {}) {
   const lang = rubric.feedbackLanguage || 'ca';
 
   const systemConfig = [
@@ -114,6 +114,8 @@ export async function evaluate(transcript, rubric, anthropic, { model = 'claude-
   const firstText = first.content.find(b => b.type === 'text');
   if (!firstText) throw new Error('Claude returned no text content in first attempt');
   const rawFirst = firstText.text.trim();
+
+  onUsage?.(first.usage);
 
   try {
     return validateEvaluation(rawFirst, rubric);

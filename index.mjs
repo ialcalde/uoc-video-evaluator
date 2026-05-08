@@ -163,11 +163,11 @@ async function main() {
     async ({ videoPath, student, cleanup }, idx) => {
       log.info(`[${idx + 1}/${total}] Starting ${student}`);
       try {
-        const evaluation = await processVideo({
+        const { evaluation, tokenUsage } = await processVideo({
           videoPath, student, anthropic, openai, rubric,
           model, thinking, skipExisting, outputDir: OUT_DIR, tmpDir: TMP_DIR, log,
         });
-        return { student, status: 'ok', evaluation };
+        return { student, status: 'ok', evaluation, tokenUsage };
       } catch (err) {
         log.error(`[${student}] Failed: ${err.message}`);
         return { student, status: 'error', error: err.message };
@@ -187,10 +187,29 @@ async function main() {
   const nError   = results.filter(r => r.status === 'error').length;
   const elapsedS = ((Date.now() - batchStart) / 1000).toFixed(1);
 
+  // Aggregate token usage across all successful evaluations
+  const totalTokens = results.reduce((acc, r) => {
+    const u = r.tokenUsage;
+    if (!u) return acc;
+    return {
+      input:      acc.input      + (u.input_tokens               ?? 0),
+      output:     acc.output     + (u.output_tokens              ?? 0),
+      cacheHit:   acc.cacheHit   + (u.cache_read_input_tokens    ?? 0),
+      cacheWrite: acc.cacheWrite + (u.cache_creation_input_tokens ?? 0),
+    };
+  }, { input: 0, output: 0, cacheHit: 0, cacheWrite: 0 });
+
+  const tokensLine = totalTokens.input > 0
+    ? `Tokens    in=${totalTokens.input} out=${totalTokens.output}` +
+      (totalTokens.cacheHit   ? ` cache-hit=${totalTokens.cacheHit}`   : '') +
+      (totalTokens.cacheWrite ? ` cache-write=${totalTokens.cacheWrite}` : '')
+    : null;
+
   console.log('');
   log.info('════════════════════════════════════════════════════════');
   log.info(`SUMMARY   ${nOk} ok  /  ${nError} errors  /  ${results.length} total`);
   log.info(`Elapsed   ${elapsedS}s`);
+  if (tokensLine) log.info(tokensLine);
   log.info(`CSV       ${csvPath}`);
   log.info(`Output    ${OUT_DIR}`);
   log.info('════════════════════════════════════════════════════════');

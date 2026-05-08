@@ -51,7 +51,7 @@ export async function processVideo({
 
   if (skipExisting && existsSync(evalPath)) {
     log.info(`[${student}] Already evaluated — skipping.`);
-    return JSON.parse(await readFile(evalPath, 'utf8'));
+    return { evaluation: JSON.parse(await readFile(evalPath, 'utf8')), tokenUsage: null };
   }
 
   try {
@@ -74,7 +74,11 @@ export async function processVideo({
 
     // 3. Evaluate
     log.info(`[${student}] Evaluating with Claude…`);
-    const evaluation = await evaluate(transcript, rubric, anthropic, { model, thinking });
+    let tokenUsage;
+    const evaluation = await evaluate(transcript, rubric, anthropic, {
+      model, thinking,
+      onUsage: u => { tokenUsage = u; },
+    });
     evaluation.evaluatedAt = new Date().toISOString();
 
     // 4. Write output files
@@ -82,8 +86,14 @@ export async function processVideo({
     await writeFeedback(studentDir, evaluation, feedbackLang);
 
     const elapsedS = ((Date.now() - start) / 1000).toFixed(1);
+    if (tokenUsage) {
+      const { input_tokens: inp, output_tokens: out,
+              cache_read_input_tokens: cacheHit = 0,
+              cache_creation_input_tokens: cacheWrite = 0 } = tokenUsage;
+      log.info(`[${student}] Tokens: in=${inp} out=${out}${cacheHit ? ` cache-hit=${cacheHit}` : ''}${cacheWrite ? ` cache-write=${cacheWrite}` : ''}`);
+    }
     log.ok(`[${student}] Done — score: ${evaluation.weightedScore}/10  (${evaluation.grade}) — ${elapsedS}s`);
-    return evaluation;
+    return { evaluation, tokenUsage };
 
   } finally {
     if (existsSync(audioPath)) {

@@ -208,4 +208,29 @@ describe('evaluate', () => {
     assert.deepEqual(content[0].cache_control, { type: 'ephemeral' }, 'rubric block should be cached');
     assert.ok(!content[content.length - 1].cache_control,             'transcript block should not be cached');
   });
+
+  it('calls onUsage callback with the usage object from the API response', async () => {
+    const fakeUsage = { input_tokens: 1234, output_tokens: 456,
+                        cache_read_input_tokens: 800, cache_creation_input_tokens: 0 };
+    const client = {
+      messages: {
+        stream: () => ({
+          finalMessage: async () => ({
+            content: [{ type: 'text', text: JSON.stringify(validEvaluation) }],
+            usage:   fakeUsage,
+          }),
+        }),
+        create: async () => ({ content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] }),
+      },
+    };
+
+    let receivedUsage;
+    await evaluate(mockTranscript, mockRubric, client, { onUsage: u => { receivedUsage = u; } });
+    assert.deepEqual(receivedUsage, fakeUsage);
+  });
+
+  it('does not require onUsage (omitting it is safe)', async () => {
+    const client = makeClient(JSON.stringify(validEvaluation));
+    await assert.doesNotReject(() => evaluate(mockTranscript, mockRubric, client));
+  });
 });

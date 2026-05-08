@@ -66,7 +66,7 @@ describe('processVideo', () => {
       transcribeFn:   trackingTranscribe,
     });
 
-    assert.equal(result.weightedScore, validEvaluation.weightedScore, 'should return cached result');
+    assert.equal(result.evaluation.weightedScore, validEvaluation.weightedScore, 'should return cached result');
     assert.equal(transcribeCalled, false, 'should not call Whisper when skipping');
   });
 
@@ -339,6 +339,64 @@ describe('processVideo', () => {
     });
 
     assert.deepEqual(capturedThinking, { type: 'adaptive' });
+  });
+
+  // ── tokenUsage in return value ────────────────────────────────────────────────
+
+  it('returns tokenUsage from the evaluate call', async () => {
+    const fakeUsage = { input_tokens: 500, output_tokens: 100,
+                        cache_read_input_tokens: 300, cache_creation_input_tokens: 0 };
+    const trackingAnthropic = {
+      messages: {
+        stream: () => ({
+          finalMessage: async () => ({
+            content: [{ type: 'text', text: JSON.stringify(validEvaluation) }],
+            usage:   fakeUsage,
+          }),
+        }),
+        create: async () => ({ content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] }),
+      },
+    };
+
+    const result = await processVideo({
+      videoPath:      '/fake/video.mp4',
+      student:        'usage_student',
+      anthropic:      trackingAnthropic,
+      openai:         {},
+      rubric:         mockRubric,
+      outputDir:      outDir,
+      tmpDir,
+      log:            noop,
+      extractAudioFn: noopExtract,
+      transcribeFn:   makeTranscribe(),
+    });
+
+    assert.deepEqual(result.tokenUsage, fakeUsage);
+    assert.equal(result.evaluation.weightedScore, validEvaluation.weightedScore);
+  });
+
+  it('returns tokenUsage:null when skipExisting returns from cache', async () => {
+    const student    = 'cached_usage_student';
+    const studentDir2 = join(outDir, student);
+    mkdirSync(studentDir2, { recursive: true });
+    writeFileSync(join(studentDir2, 'evaluation.json'), JSON.stringify(validEvaluation), 'utf8');
+
+    const result = await processVideo({
+      videoPath:      '/fake/video.mp4',
+      student,
+      anthropic:      makeAnthropic(),
+      openai:         {},
+      rubric:         mockRubric,
+      outputDir:      outDir,
+      tmpDir,
+      skipExisting:   true,
+      log:            noop,
+      extractAudioFn: noopExtract,
+      transcribeFn:   makeTranscribe(),
+    });
+
+    assert.equal(result.tokenUsage, null);
+    assert.equal(result.evaluation.weightedScore, validEvaluation.weightedScore);
   });
 
 });
