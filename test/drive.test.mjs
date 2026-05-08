@@ -5,7 +5,7 @@ import { readFile } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { Readable } from 'stream';
-import { listVideos, downloadVideo } from '../src/drive.mjs';
+import { listVideos, downloadVideo, createDriveClient } from '../src/drive.mjs';
 
 // Build a minimal mock google.drive client.
 function makeDrive({ files = [], streamChunks = [Buffer.from('data')] } = {}) {
@@ -166,6 +166,19 @@ describe('drive', () => {
     );
 
     assert.ok(!existsSync(destPath), 'partial file should be deleted after stream error');
+  });
+
+  // ── createDriveClient ───────────────────────────────────────────────────────
+
+  it('createDriveClient: returns an object with a files property', () => {
+    // We can't call the real Google API in unit tests, but we can verify the
+    // factory returns an object shaped like a Drive client.
+    const fakeAuth = { credentials: {}, request: async () => ({ data: {} }) };
+    const client   = createDriveClient(fakeAuth);
+    assert.ok(client,               'should return a client object');
+    assert.ok(client.files,         'client should have a files namespace');
+    assert.ok(client.files.list,    'client.files.list should be a function');
+    assert.ok(client.files.get,     'client.files.get should be a function');
   });
 
 });

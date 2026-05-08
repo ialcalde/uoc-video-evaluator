@@ -443,6 +443,17 @@ describe('validateRubric', () => {
     assert.throws(() => validateRubric(bad), /label/i);
   });
 
+  it('throws when a criterion description is not a string', () => {
+    const bad = { ...mockRubric, criteria: [{ ...mockRubric.criteria[0], description: 42 }, mockRubric.criteria[1]] };
+    assert.throws(() => validateRubric(bad), /description/i);
+  });
+
+  it('throws when a level description is not a string', () => {
+    const badLevels = [{ score: 5, label: 'X', description: null }];
+    const bad = { ...mockRubric, criteria: [{ ...mockRubric.criteria[0], levels: badLevels }, mockRubric.criteria[1]] };
+    assert.throws(() => validateRubric(bad), /description/i);
+  });
+
   it('throws when duplicate criterion ids exist', () => {
     const bad = { ...mockRubric, criteria: [mockRubric.criteria[0], mockRubric.criteria[0]] };
     assert.throws(() => validateRubric(bad), /duplicate criterion id/i);
