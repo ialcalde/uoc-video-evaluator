@@ -54,8 +54,13 @@ export async function processVideo({
 
   if (skipExisting && existsSync(evalPath) &&
       existsSync(join(studentDir, `feedback_${feedbackLang}.txt`))) {
-    log.info(`[${student}] Already evaluated — skipping.`);
-    return { evaluation: JSON.parse(await readFile(evalPath, 'utf8')), tokenUsage: null };
+    try {
+      const cached = JSON.parse(await readFile(evalPath, 'utf8'));
+      log.info(`[${student}] Already evaluated — skipping.`);
+      return { evaluation: cached, tokenUsage: null };
+    } catch {
+      log.warn?.(`[${student}] Cached evaluation.json is unreadable — re-evaluating.`);
+    }
   }
 
   try {

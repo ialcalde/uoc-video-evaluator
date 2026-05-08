@@ -698,4 +698,26 @@ describe('processVideo', () => {
     assert.ok(existsSync(join(studentDir, 'feedback_ca.txt')), 'feedback_ca.txt should exist when feedbackLanguage defaults to ca');
   });
 
+  it('re-evaluates when skipExisting=true but cached evaluation.json is malformed JSON', async () => {
+    const student    = 'corrupt_cache_student';
+    const studentDir = join(outDir, student);
+    mkdirSync(studentDir, { recursive: true });
+    writeFileSync(join(studentDir, 'evaluation.json'), '{ INVALID JSON }', 'utf8');
+    writeFileSync(join(studentDir, 'feedback_ca.txt'), 'old feedback', 'utf8');
+
+    let transcribeCalled = false;
+    const result = await processVideo({
+      videoPath: '/fake/video.mp4', student,
+      anthropic: makeAnthropic(), openai: {},
+      rubric: mockRubric, outputDir: outDir, tmpDir,
+      skipExisting:   true,
+      extractAudioFn: noopExtract,
+      transcribeFn:   async () => { transcribeCalled = true; return { text: 'hello world', segments: [] }; },
+      log: { info: () => {}, ok: () => {}, warn: () => {} },
+    });
+
+    assert.ok(transcribeCalled, 'should re-evaluate when cached JSON is corrupt');
+    assert.equal(result.evaluation.weightedScore, validEvaluation.weightedScore);
+  });
+
 });
