@@ -118,9 +118,10 @@ export async function evaluate(transcript, rubric, anthropic, { model = 'claude-
   try {
     return validateEvaluation(rawFirst, rubric);
   } catch (firstError) {
-    // ── Schema-correction retry — reuse systemConfig/userContent for cache hit
+    // ── Schema-correction retry — streamed for the same timeout-safety reason as the
+    //    first call; the input (rubric + transcript + first response) can be large.
     const retry = await withRetry(
-      () => anthropic.messages.create({
+      () => anthropic.messages.stream({
         ...callParams,
         messages: [
           { role: 'user',      content: userContent },
@@ -133,7 +134,7 @@ export async function evaluate(transcript, rubric, anthropic, { model = 'claude-
               `Sense text addicional, sense blocs markdown.`,
           },
         ],
-      }),
+      }).finalMessage(),
       { onRetry: retryLog }
     );
 

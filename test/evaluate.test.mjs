@@ -4,7 +4,7 @@ import { evaluate } from '../src/evaluate.mjs';
 import { mockRubric, validEvaluation } from './fixtures.mjs';
 
 // Build a minimal mock Anthropic client.
-// First call goes through stream().finalMessage(); retries go through create().
+// Both the first call and the correction retry go through stream().finalMessage().
 function makeClient(...responses) {
   let call = 0;
   const next = () => ({ content: [{ type: 'text', text: responses[Math.min(call++, responses.length - 1)] }] });
