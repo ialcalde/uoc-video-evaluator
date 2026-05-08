@@ -413,6 +413,50 @@ describe('evaluate', () => {
     assert.equal(receivedUsage.cache_creation_input_tokens, 50);
   });
 
+  it('falls back to English structural labels for an unknown feedbackLanguage code', async () => {
+    let capturedContent;
+    const frRubric = { ...mockRubric, feedbackLanguage: 'fr' };
+    const client = {
+      messages: {
+        stream: (params) => ({
+          finalMessage: async () => {
+            capturedContent = params.messages[0].content;
+            return { content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] };
+          },
+        }),
+        create: async () => ({ content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] }),
+      },
+    };
+
+    await evaluate(mockTranscript, frRubric, client);
+
+    const rubricText = capturedContent[0].text;
+    assert.ok(rubricText.includes('Rubric:'), 'unknown language should fall back to English "Rubric:" label');
+    assert.ok(rubricText.includes('Grading scale'), 'unknown language should fall back to English grading scale label');
+  });
+
+  it('uses feedbackLanguage as transcript lang when rubric.language is absent', async () => {
+    let capturedContent;
+    const rubricNoLang = { ...mockRubric, feedbackLanguage: 'en' };
+    delete rubricNoLang.language;
+    const client = {
+      messages: {
+        stream: (params) => ({
+          finalMessage: async () => {
+            capturedContent = params.messages[0].content;
+            return { content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] };
+          },
+        }),
+        create: async () => ({ content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] }),
+      },
+    };
+
+    await evaluate(mockTranscript, rubricNoLang, client);
+
+    const transcriptText = capturedContent[capturedContent.length - 1].text;
+    assert.ok(transcriptText.includes('(lang: en)'), 'transcript block should use feedbackLanguage when language is absent');
+  });
+
   it('combines first-attempt and correction-retry token usage in onUsage', async () => {
     const firstUsage = { input_tokens: 1000, output_tokens: 200,
                          cache_read_input_tokens: 400, cache_creation_input_tokens: 0 };

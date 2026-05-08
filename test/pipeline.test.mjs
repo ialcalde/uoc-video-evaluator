@@ -604,4 +604,50 @@ describe('processVideo', () => {
     assert.equal(result.evaluation.weightedScore, validEvaluation.weightedScore);
   });
 
+  // ── Language fallback defaults ────────────────────────────────────────────────
+
+  it('defaults transcriptLang to "ca" when rubric.language is absent', async () => {
+    const student     = 'no_lang_student';
+    const rubricNoLang = { ...mockRubric };
+    delete rubricNoLang.language;   // rubric.language || 'ca' → 'ca'
+
+    await processVideo({
+      videoPath:      '/fake/video.mp4',
+      student,
+      anthropic:      makeAnthropic(),
+      openai:         {},
+      rubric:         rubricNoLang,
+      outputDir:      outDir,
+      tmpDir,
+      log:            noop,
+      extractAudioFn: noopExtract,
+      transcribeFn:   makeTranscribe(),
+    });
+
+    const studentDir = join(outDir, student);
+    assert.ok(existsSync(join(studentDir, 'transcript_ca.txt')), 'transcript_ca.txt should exist when language defaults to ca');
+  });
+
+  it('defaults feedbackLang to "ca" when rubric.feedbackLanguage is absent', async () => {
+    const student          = 'no_feedback_lang_student';
+    const rubricNoFbLang   = { ...mockRubric };
+    delete rubricNoFbLang.feedbackLanguage;   // rubric.feedbackLanguage || 'ca' → 'ca'
+
+    await processVideo({
+      videoPath:      '/fake/video.mp4',
+      student,
+      anthropic:      makeAnthropic(),
+      openai:         {},
+      rubric:         rubricNoFbLang,
+      outputDir:      outDir,
+      tmpDir,
+      log:            noop,
+      extractAudioFn: noopExtract,
+      transcribeFn:   makeTranscribe(),
+    });
+
+    const studentDir = join(outDir, student);
+    assert.ok(existsSync(join(studentDir, 'feedback_ca.txt')), 'feedback_ca.txt should exist when feedbackLanguage defaults to ca');
+  });
+
 });
