@@ -73,15 +73,16 @@ export function validateEvaluation(raw, rubric) {
     }
   }
 
-  // 5. Normalise weights, order, and recompute weightedScore and grade
-  //    Claude's reported weights might differ from the rubric — always use rubric values.
-  const weightMap = Object.fromEntries(rubric.criteria.map(c => [c.id, c.weight]));
+  // 5. Normalise name, weight, order, and recompute weightedScore and grade.
+  //    Always use rubric-canonical values regardless of what Claude returned.
+  const rubricMap = Object.fromEntries(rubric.criteria.map(c => [c.id, c]));
   for (const c of parsed.criteria) {
-    c.weight = weightMap[c.id];
+    c.name   = rubricMap[c.id].nameEn;
+    c.weight = rubricMap[c.id].weight;
   }
 
   // Sort criteria to match rubric order (Claude may return them in a different order).
-  const rubricOrder = new Map(rubric.criteria.map((c, i) => [c.id, i]));
+  const rubricOrder = new Map(rubric.criteria.map(({ id }, i) => [id, i]));
   parsed.criteria.sort((a, b) => rubricOrder.get(a.id) - rubricOrder.get(b.id));
 
   const computed       = parsed.criteria.reduce((s, c) => s + c.score * c.weight, 0);

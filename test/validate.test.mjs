@@ -234,6 +234,20 @@ describe('validateEvaluation', () => {
     );
   });
 
+  // ── name normalisation ─────────────────────────────────────────────────────
+
+  it('normalises criterion name to rubric nameEn regardless of what Claude returned', () => {
+    const ev = {
+      ...validEvaluation,
+      criteria: validEvaluation.criteria.map(c => ({ ...c, name: 'Wrong translated name' })),
+    };
+    const result = validateEvaluation(toRaw(ev), mockRubric);
+    assert.equal(result.criteria[0].name, mockRubric.criteria[0].nameEn,
+      'name should be overwritten with rubric nameEn');
+    assert.equal(result.criteria[1].name, mockRubric.criteria[1].nameEn,
+      'name should be overwritten with rubric nameEn');
+  });
+
   // ── criteria ordering ───────────────────────────────────────────────────────
 
   it('normalises criteria order to match rubric order', () => {
