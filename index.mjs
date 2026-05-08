@@ -205,11 +205,25 @@ async function main() {
       (totalTokens.cacheWrite ? ` cache-write=${totalTokens.cacheWrite}` : '')
     : null;
 
+  // Build per-student score table
+  const colW = Math.max(20, ...results.map(r => r.student.length)) + 2;
+  const scoreLines = results.map(r => {
+    if (r.status === 'ok') {
+      const s    = String(r.evaluation.weightedScore).padEnd(6);
+      const name = r.student.padEnd(colW);
+      return `  ${name}${s}  ${r.evaluation.grade}`;
+    }
+    return `  ${r.student.padEnd(colW)}ERROR: ${r.error}`;
+  });
+
   console.log('');
   log.info('════════════════════════════════════════════════════════');
   log.info(`SUMMARY   ${nOk} ok  /  ${nError} errors  /  ${results.length} total`);
   log.info(`Elapsed   ${elapsedS}s`);
   if (tokensLine) log.info(tokensLine);
+  log.info('────────────────────────────────────────────────────────');
+  for (const line of scoreLines) log.info(line);
+  log.info('────────────────────────────────────────────────────────');
   log.info(`CSV       ${csvPath}`);
   log.info(`Output    ${OUT_DIR}`);
   log.info('════════════════════════════════════════════════════════');
