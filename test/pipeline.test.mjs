@@ -604,6 +604,26 @@ describe('processVideo', () => {
     assert.equal(result.evaluation.weightedScore, validEvaluation.weightedScore);
   });
 
+  // ── default log parameter ────────────────────────────────────────────────────
+
+  it('works without a log argument (default no-op log is used)', async () => {
+    const student = 'no_log_student';
+    // Intentionally omit the log option to exercise the default { info:()=>{}, ok:()=>{} }
+    await assert.doesNotReject(() =>
+      processVideo({
+        videoPath:      '/fake/video.mp4',
+        student,
+        anthropic:      makeAnthropic(),
+        openai:         {},
+        rubric:         mockRubric,
+        outputDir:      outDir,
+        tmpDir,
+        extractAudioFn: noopExtract,
+        transcribeFn:   makeTranscribe(),
+      })
+    );
+  });
+
   // ── Language fallback defaults ────────────────────────────────────────────────
 
   it('defaults transcriptLang to "ca" when rubric.language is absent', async () => {

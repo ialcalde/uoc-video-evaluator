@@ -356,6 +356,22 @@ describe('report', () => {
     }
   });
 
+  it('rebuildCsv: skips non-directory entries (plain files) in outputDir', async () => {
+    const rebuildBase = mkdtempSync(join(tmpdir(), 'uoc-rebuild-test-'));
+    try {
+      // A plain file in the output root should be silently skipped (not throw)
+      writeFileSync(join(rebuildBase, 'stray-file.txt'), 'some content', 'utf8');
+
+      const dir = ensureStudentDir(rebuildBase, 'real_student');
+      await writeEvaluation(dir, validEvaluation);
+
+      const { count } = await rebuildCsv(rebuildBase, mockRubric);
+      assert.equal(count, 1, 'stray file should not count as a student');
+    } finally {
+      rmSync(rebuildBase, { recursive: true, force: true });
+    }
+  });
+
   it('rebuildCsv: returns count=0 when no evaluation.json files exist', async () => {
     const rebuildBase = mkdtempSync(join(tmpdir(), 'uoc-rebuild-test-'));
     try {
