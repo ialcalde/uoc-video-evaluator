@@ -11,7 +11,6 @@ function makeClient(...responses) {
   return {
     messages: {
       stream:  ()    => ({ finalMessage: async () => next() }),
-      create:  async () => next(),
     },
   };
 }
@@ -70,7 +69,7 @@ describe('evaluate', () => {
             return { content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] };
           },
         }),
-        create: async () => ({ content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] }),
+
       },
     };
 
@@ -95,7 +94,7 @@ describe('evaluate', () => {
             return { content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] };
           },
         }),
-        create: async () => ({ content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] }),
+
       },
     };
 
@@ -122,7 +121,7 @@ describe('evaluate', () => {
             return { content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] };
           },
         }),
-        create: async () => ({ content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] }),
+
       },
     };
 
@@ -147,7 +146,7 @@ describe('evaluate', () => {
             return { content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] };
           },
         }),
-        create: async () => ({ content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] }),
+
       },
     };
 
@@ -171,7 +170,7 @@ describe('evaluate', () => {
             return { content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] };
           },
         }),
-        create: async () => ({ content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] }),
+
       },
     };
 
@@ -189,7 +188,7 @@ describe('evaluate', () => {
             return { content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] };
           },
         }),
-        create: async () => ({ content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] }),
+
       },
     };
 
@@ -208,7 +207,7 @@ describe('evaluate', () => {
             ],
           }),
         }),
-        create: async () => ({ content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] }),
+
       },
     };
 
@@ -226,7 +225,7 @@ describe('evaluate', () => {
             return { content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] };
           },
         }),
-        create: async () => ({ content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] }),
+
       },
     };
 
@@ -244,7 +243,7 @@ describe('evaluate', () => {
             return { content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] };
           },
         }),
-        create: async () => ({ content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] }),
+
       },
     };
 
@@ -273,7 +272,7 @@ describe('evaluate', () => {
             usage:   fakeUsage,
           }),
         }),
-        create: async () => ({ content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] }),
+
       },
     };
 
@@ -300,7 +299,7 @@ describe('evaluate', () => {
             return { content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] };
           },
         }),
-        create: async () => ({ content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] }),
+
       },
     };
     // omit onRetry → the console.warn fallback function is used; baseDelay:0 keeps the test instant
@@ -326,7 +325,7 @@ describe('evaluate', () => {
             return { content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] };
           },
         }),
-        create: async () => ({ content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] }),
+
       },
     };
 
@@ -345,7 +344,7 @@ describe('evaluate', () => {
             content: [{ type: 'thinking', thinking: 'Only thinking, no text block' }],
           }),
         }),
-        create: async () => ({ content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] }),
+
       },
     };
     await assert.rejects(
@@ -369,7 +368,7 @@ describe('evaluate', () => {
             return { content: [{ type: 'thinking', thinking: 'Thinking only, no text' }] };
           },
         }),
-        create: async () => ({ content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] }),
+
       },
     };
     await assert.rejects(
@@ -402,7 +401,7 @@ describe('evaluate', () => {
             return { content: [{ type: 'text', text: JSON.stringify(validEvaluation) }], usage: retryUsage };
           },
         }),
-        create: async () => ({ content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] }),
+
       },
     };
 
@@ -428,7 +427,7 @@ describe('evaluate', () => {
             return { content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] };
           },
         }),
-        create: async () => ({ content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] }),
+
       },
     };
 
@@ -451,7 +450,7 @@ describe('evaluate', () => {
             return { content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] };
           },
         }),
-        create: async () => ({ content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] }),
+
       },
     };
 
@@ -471,7 +470,7 @@ describe('evaluate', () => {
             return { content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] };
           },
         }),
-        create: async () => ({ content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] }),
+
       },
     };
 
@@ -494,7 +493,7 @@ describe('evaluate', () => {
             return { content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] };
           },
         }),
-        create: async () => ({ content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] }),
+
       },
     };
 
@@ -515,7 +514,7 @@ describe('evaluate', () => {
             return { content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] };
           },
         }),
-        create: async () => ({ content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] }),
+
       },
     };
 
@@ -537,7 +536,7 @@ describe('evaluate', () => {
             return { content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] };
           },
         }),
-        create: async () => ({ content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] }),
+
       },
     };
 
@@ -569,7 +568,7 @@ describe('evaluate', () => {
             return { content: [{ type: 'text', text: JSON.stringify(validEvaluation) }], usage: retryUsage };
           },
         }),
-        create: async () => ({ content: [{ type: 'text', text: JSON.stringify(validEvaluation) }] }),
+
       },
     };
 
